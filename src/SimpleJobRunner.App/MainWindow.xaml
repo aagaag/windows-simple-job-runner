@@ -1,0 +1,147 @@
+<Window x:Class="SimpleJobRunner.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Simple Job Runner"
+        Height="780"
+        MinHeight="640"
+        Width="1160"
+        MinWidth="940"
+        AllowDrop="True"
+        DragOver="Window_DragOver"
+        Drop="Window_Drop">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,12">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Content="Open outputs folder" Command="{Binding OpenOutputsFolderCommand}" />
+                <Button Content="Settings" Command="{Binding SettingsCommand}" Margin="0" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Simple Job Runner" FontSize="24" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding SetupMessage}" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0" />
+            </StackPanel>
+        </DockPanel>
+
+        <Border Grid.Row="1"
+                BorderBrush="#D6DAE0"
+                BorderThickness="1"
+                Background="#F7F9FB"
+                Padding="10"
+                Margin="0,0,0,12"
+                Visibility="{Binding SetupBannerVisibility}">
+            <TextBlock Text="{Binding SetupMessage}" TextWrapping="Wrap" />
+        </Border>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="340" />
+                <ColumnDefinition Width="18" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <GroupBox Header="Input files" Grid.Column="0" Padding="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,8">
+                        <Button Content="Add files" Command="{Binding AddFilesCommand}" />
+                        <Button Content="Add folder" Command="{Binding AddFolderCommand}" />
+                        <Button Content="Clear" Command="{Binding ClearInputsCommand}" Margin="0" />
+                    </StackPanel>
+                    <ListBox Grid.Row="1" ItemsSource="{Binding Inputs}" BorderBrush="#CED4DA">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="2,4">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Path}" FontSize="11" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </GroupBox>
+
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="2*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                    <Button Content="{Binding RecordButtonText}" Command="{Binding RecordCommand}" />
+                    <Button Content="Stop" Command="{Binding StopRecordingCommand}" />
+                    <Button Content="Run Simple Job" Command="{Binding RunJobCommand}" Background="{StaticResource AccentBrush}" Foreground="White" />
+                    <Button Content="Forget this job" Command="{Binding ForgetJobCommand}" Margin="0" />
+                </StackPanel>
+
+                <GroupBox Header="Prompt" Grid.Row="1" Padding="8" Margin="0,0,0,10">
+                    <TextBox Text="{Binding PromptText, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             FontFamily="Consolas"
+                             FontSize="13"
+                             MinHeight="180" />
+                </GroupBox>
+
+                <TextBlock Grid.Row="2" Text="{Binding StatusMessage}" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8" />
+
+                <GroupBox Header="Progress" Grid.Row="3" Padding="8" Margin="0,0,0,10">
+                    <ListBox ItemsSource="{Binding ProgressItems}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel Margin="0,2">
+                                    <TextBlock DockPanel.Dock="Left" Text="{Binding Timestamp, StringFormat={}{0:HH:mm:ss}}" Foreground="{StaticResource MutedBrush}" Width="72" />
+                                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </GroupBox>
+
+                <GroupBox Header="Outputs" Grid.Row="4" Padding="8">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <ListBox Grid.Row="0" ItemsSource="{Binding Outputs}" SelectedItem="{Binding SelectedOutput}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="2,4">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding FinalPath}" FontSize="11" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="Open file" Command="{Binding OpenSelectedOutputCommand}" />
+                            <Button Content="Open outputs folder" Command="{Binding OpenOutputsFolderCommand}" Margin="0" />
+                        </StackPanel>
+                    </Grid>
+                </GroupBox>
+            </Grid>
+        </Grid>
+
+        <ProgressBar Grid.Row="3"
+                     Height="4"
+                     Margin="0,12,0,0"
+                     IsIndeterminate="{Binding IsBusy}"
+                     Visibility="{Binding BusyVisibility}" />
+    </Grid>
+</Window>

@@ -1,0 +1,48 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+      Name="Simple Job Runner"
+      Manufacturer="AAG"
+      Version="$(var.ProductVersion)"
+      UpgradeCode="{9A1F29B6-5C2C-4B7E-8A2D-18E7C7AB0011}"
+      Scope="perMachine"
+      Compressed="yes">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Simple Job Runner is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Simple Job Runner" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Simple Job Runner">
+        <Component Id="StartMenuShortcutComponent" Guid="{CE34F99C-917D-4F84-91D2-2A833A18C501}">
+          <Shortcut
+              Id="StartMenuShortcut"
+              Name="Simple Job Runner"
+              Target="[INSTALLFOLDER]SimpleJobRunner.App.exe"
+              WorkingDirectory="INSTALLFOLDER" />
+          <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+          <RegistryValue Root="HKCU" Key="Software\AAG\SimpleJobRunner" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="DesktopShortcutComponent" Guid="{2313D49B-4EA4-4AF2-B26E-98BCE95BD411}" Condition="INSTALLDESKTOPSHORTCUT">
+        <Shortcut
+            Id="DesktopShortcut"
+            Name="Simple Job Runner"
+            Target="[INSTALLFOLDER]SimpleJobRunner.App.exe"
+            WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="Software\AAG\SimpleJobRunner" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="Simple Job Runner" Level="1">
+      <ComponentGroupRef Id="PublishedFiles" />
+      <ComponentRef Id="StartMenuShortcutComponent" />
+      <ComponentRef Id="DesktopShortcutComponent" />
+    </Feature>
+  </Package>
+</Wix>
