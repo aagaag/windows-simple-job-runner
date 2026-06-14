@@ -3,6 +3,7 @@
 - Audio is sent to OpenAI for transcription only when the user clicks **Record** and an OpenAI API key is configured.
 - Codex CLI may send prompts and relevant file context to OpenAI to perform the task.
 - Selected inputs are copied into local disposable run folders.
+- The final text result is captured locally in the disposable run folder as `summary.md` and shown in the app.
 - Final outputs are copied to the configured output folder.
 - Run folders can be deleted with **Forget this job**.
 - The app sends no telemetry unless explicitly added later.

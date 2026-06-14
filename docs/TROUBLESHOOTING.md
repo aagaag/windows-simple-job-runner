@@ -32,9 +32,15 @@ codex login
 
 Use ChatGPT login if you want Codex to use your ChatGPT plan entitlement.
 
-## No Output Created
+## No Files Created
 
-Simple Job Runner requires Codex to write deliverables to `./outputs`. Edit the prompt to name the expected file type and output, then rerun.
+That can be expected for Text Query mode. A run is successful when the Text Result tab contains a useful answer, even if the Files tab is empty.
+
+For File Job mode, Codex should write requested deliverables to `./outputs`. Edit the prompt to name the expected file type and output, then rerun.
+
+## External Or Sensitive Confirmation Appears
+
+The app asks for confirmation when a prompt looks like it may create something outside the run folder, upload or send data, modify system configuration, delete files, change services, install packages, or require elevation. Cancel if the side effect is not intended, or change the mode before running.
 
 ## Forget This Job Did Not Delete Final Outputs
 

@@ -22,5 +22,6 @@ GitHub repository secrets are only for CI/CD. They may include code-signing cert
 - No API key in logs.
 - No API key in prompt files.
 - No API key in transcripts.
+- No API key in summary files or generated output files.
 - No API key in crash reports.
 - No full API key displayed after saving.

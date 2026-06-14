@@ -62,7 +62,7 @@ public sealed class CoreTests : IDisposable
         await manager.WriteRunInstructionsAsync(run, CancellationToken.None);
 
         var text = await File.ReadAllTextAsync(Path.Combine(run.RunRoot, "AGENTS.md"));
-        Assert.Contains("disposable one-off file-production task", text);
+        Assert.Contains("disposable one-off Simple Job task", text);
         Assert.Contains("Do not initialize Git", text);
         Assert.Contains("Treat input files as confidential", text);
     }
@@ -87,13 +87,15 @@ public sealed class CoreTests : IDisposable
         var run = TestRun();
         var builder = new PromptBuilder();
 
-        var prompt = builder.BuildPrompt("Make a CSV", run);
+        var prompt = builder.BuildPrompt("Make a CSV", run, TaskMode.FileJob);
 
         Assert.Contains("Use the instructions in AGENTS.md.", prompt);
+        Assert.Contains("Task mode:", prompt);
+        Assert.Contains("File Job", prompt);
         Assert.Contains("User task:", prompt);
         Assert.Contains("./inbox", prompt);
         Assert.Contains("./outputs", prompt);
-        Assert.Throws<InvalidOperationException>(() => builder.BuildPrompt("use " + FakeOpenAiKey(), run));
+        Assert.Throws<InvalidOperationException>(() => builder.BuildPrompt("use " + FakeOpenAiKey(), run, TaskMode.TextQuery));
     }
 
     [Fact]
@@ -111,6 +113,101 @@ public sealed class CoreTests : IDisposable
         Assert.Contains("workspace-write", command.Arguments);
         Assert.DoesNotContain("--dangerously-bypass-approvals-and-sandbox", command.Arguments);
         Assert.DoesNotContain("danger-full-access", command.Arguments);
+    }
+
+    [Fact]
+    public void CodexCommandBuilder_CanUseReadOnlySandboxForTextQueries()
+    {
+        var run = TestRun();
+        var command = new CodexCommandBuilder().Build(run, CodexSandboxMode.ReadOnly);
+
+        Assert.Contains("read-only", command.Arguments);
+        Assert.DoesNotContain("workspace-write", command.Arguments);
+    }
+
+    [Fact]
+    public void TaskModeClassifier_SelectsExpectedModes()
+    {
+        var classifier = new TaskModeClassifier();
+
+        Assert.Equal(TaskMode.TextQuery, classifier.Classify("How much free space is available on the local disks?"));
+        Assert.Equal(TaskMode.FileJob, classifier.Classify("Create a small CSV file in outputs."));
+        Assert.Equal(TaskMode.ExternalAction, classifier.Classify("Create a private GitHub repository called simple-job-test."));
+        Assert.Equal(TaskMode.AdminSensitive, classifier.Classify("Install packages and restart service."));
+    }
+
+    [Fact]
+    public async Task RunResultFactory_AllowsSuccessfulTextResultWithoutOutputFiles()
+    {
+        var run = TestRun();
+        Directory.CreateDirectory(run.RunRoot);
+        await File.WriteAllTextAsync(run.SummaryPath, "Drive | Free\nC: | 100 GB");
+
+        var result = await new RunResultFactory().CreateAsync(
+            run,
+            TaskMode.TextQuery,
+            [],
+            ["codex exec --sandbox read-only"],
+            [],
+            [],
+            [],
+            CancellationToken.None);
+
+        Assert.Equal(ResultType.Text, result.ResultType);
+        Assert.Equal("Drive | Free\nC: | 100 GB", result.TextResult);
+        Assert.Empty(result.OutputFiles);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public async Task RunResultFactory_CreatesHybridResultWhenTextAndFilesExist()
+    {
+        var run = TestRun();
+        Directory.CreateDirectory(run.RunRoot);
+        await File.WriteAllTextAsync(run.SummaryPath, "Created sample.csv with three rows.");
+        var output = new OutputFile(
+            Path.Combine(run.OutputsPath, "sample.csv"),
+            Path.Combine(run.FinalOutputPath, "sample.csv"),
+            32);
+
+        var result = await new RunResultFactory().CreateAsync(
+            run,
+            TaskMode.FileJob,
+            [output],
+            ["codex exec --sandbox workspace-write"],
+            [],
+            [],
+            [],
+            CancellationToken.None);
+
+        Assert.Equal(ResultType.Hybrid, result.ResultType);
+        Assert.Equal("Created sample.csv with three rows.", result.TextResult);
+        Assert.Single(result.OutputFiles);
+    }
+
+    [Fact]
+    public async Task RunResultFactory_ProvidesFallbackTextWhenSummaryIsMissing()
+    {
+        var run = TestRun();
+        Directory.CreateDirectory(run.RunRoot);
+        var output = new OutputFile(
+            Path.Combine(run.OutputsPath, "sample.csv"),
+            Path.Combine(run.FinalOutputPath, "sample.csv"),
+            32);
+
+        var result = await new RunResultFactory().CreateAsync(
+            run,
+            TaskMode.FileJob,
+            [output],
+            [],
+            [],
+            [],
+            [],
+            CancellationToken.None);
+
+        Assert.Equal(ResultType.Files, result.ResultType);
+        Assert.Contains("created 1 output file", result.TextResult);
+        Assert.Contains("summary.md was missing or empty.", result.Warnings);
     }
 
     [Fact]

@@ -3,7 +3,7 @@
 ## Build The MSI Locally
 
 ```powershell
-./scripts/package.ps1 -Version 0.1.0
+./scripts/package.ps1 -Version 0.2.0
 ```
 
 Outputs:

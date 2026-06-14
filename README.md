@@ -1,14 +1,15 @@
 # Simple Job Runner
 
-Simple Job Runner is a Windows desktop utility for one-off Codex file jobs. It lets you select local files, dictate a task, transcribe the task with OpenAI speech-to-text, run Codex CLI in an ephemeral local workspace, and collect generated files without creating Codex app sidebar clutter or per-job GitHub repositories.
+Simple Job Runner is a Windows desktop utility for one-off Codex jobs. It lets you ask for direct text answers, select local files, dictate a task, transcribe the task with OpenAI speech-to-text, run Codex CLI in an ephemeral local workspace, and collect generated files without creating Codex app sidebar clutter or per-job GitHub repositories.
 
 ## What It Does
 
 - Stages selected files and folders into a disposable run folder.
 - Records push-to-stop microphone audio and transcribes it with OpenAI speech-to-text.
-- Shows the transcript in an editable prompt box before any Codex run starts.
-- Runs `codex exec` non-interactively with `--skip-git-repo-check`, `--ephemeral`, `--sandbox workspace-write`, `--json`, and `--output-last-message`.
-- Copies final generated files to `Documents\Simple Job Outputs` by default.
+- Shows the transcript in a compact editable prompt box before any Codex run starts.
+- Runs `codex exec` non-interactively with `--skip-git-repo-check`, `--ephemeral`, `--json`, and `--output-last-message`.
+- Captures the final Codex answer in `run\summary.md` and displays it in the Text Result tab.
+- Copies generated files to `Documents\Simple Job Outputs` by default when a job creates files.
 - Lets the user forget a job by deleting the disposable run folder while keeping final outputs.
 
 ## What It Does Not Do
@@ -58,7 +59,23 @@ User name: openai-api-key
 2. Type a prompt directly, or record a voice prompt if an OpenAI API key is configured.
 3. Edit the prompt.
 4. Click **Run Simple Job**.
-5. Open generated files from the Outputs panel or from the output folder.
+5. Read the final answer in **Text Result**.
+6. Open generated files from **Files** when the job created files.
+
+## Task Modes
+
+Simple Job Runner auto-selects a mode from the visible prompt. You can override it before running:
+
+- **Text Query**: direct answers, status checks, local queries, calculations, inventories, and lists. Uses the `read-only` Codex sandbox where possible and does not require output files.
+- **File Job**: file generation, conversion, merge, report, Excel, CSV, Markdown, PDF, or document tasks. Uses `workspace-write` and expects final files in `run\outputs`.
+- **External Action**: GitHub repository creation, uploads, publishing, posting, sending, or external API calls. Requires confirmation before running.
+- **Admin / Sensitive**: package installation, service changes, deletes, system configuration, elevation, or other sensitive changes. Requires confirmation before running.
+
+## Text Results Vs. File Results
+
+Every run is expected to produce a text result. Simple answers can finish successfully with no files at all. File-producing jobs also produce a short text result that summarizes what was created and where it was copied.
+
+The **Text Result** tab is the primary output. It includes buttons to copy the answer, save it as `.txt`, save it as `.md`, or clear the displayed result. The **Files** tab is secondary and may be empty for successful Text Query runs.
 
 ## Ephemerality
 
@@ -68,7 +85,7 @@ Each job gets a fresh run folder under:
 %LOCALAPPDATA%\SimpleJobRunner\runs
 ```
 
-Inputs are copied into `inbox`, temporary work goes in `temp`, Codex writes deliverables to `outputs`, and final user-visible files are copied to:
+Inputs are copied into `inbox`, temporary work goes in `temp`, Codex writes requested deliverables to `outputs`, and the final text answer is captured in `summary.md`. Final user-visible files are copied to:
 
 ```text
 %USERPROFILE%\Documents\Simple Job Outputs

@@ -4,7 +4,7 @@ namespace SimpleJobRunner.Core.Codex;
 
 public sealed class CodexCommandBuilder
 {
-    public CodexCommand Build(RunContext run)
+    public CodexCommand Build(RunContext run, CodexSandboxMode sandboxMode = CodexSandboxMode.WorkspaceWrite)
     {
         ArgumentNullException.ThrowIfNull(run);
 
@@ -17,7 +17,7 @@ public sealed class CodexCommandBuilder
                 "--skip-git-repo-check",
                 "--ephemeral",
                 "--sandbox",
-                "workspace-write",
+                sandboxMode.ToCliValue(),
                 "--json",
                 "--output-last-message",
                 run.SummaryPath,
@@ -26,9 +26,9 @@ public sealed class CodexCommandBuilder
             run.RunRoot);
     }
 
-    public ProcessStartInfo BuildStartInfo(RunContext run)
+    public ProcessStartInfo BuildStartInfo(RunContext run, CodexSandboxMode sandboxMode = CodexSandboxMode.WorkspaceWrite)
     {
-        var command = Build(run);
+        var command = Build(run, sandboxMode);
         var startInfo = new ProcessStartInfo(command.FileName)
         {
             UseShellExecute = false,

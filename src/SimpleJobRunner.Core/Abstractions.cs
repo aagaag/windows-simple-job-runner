@@ -24,7 +24,7 @@ public interface IRunFolderManager
 
 public interface IPromptBuilder
 {
-    string BuildPrompt(string userPrompt, RunContext run);
+    string BuildPrompt(string userPrompt, RunContext run, TaskMode taskMode);
 }
 
 public interface ICodexRunner

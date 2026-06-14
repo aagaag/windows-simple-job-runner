@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Text;
 using System.Windows;
 using System.Windows.Input;
 using SimpleJobRunner.App.Mvvm;
@@ -22,14 +23,23 @@ public sealed class MainViewModel : ObservableObject
     private readonly IPromptBuilder _promptBuilder;
     private readonly ICodexRunner _codexRunner;
     private readonly IOutputCollector _outputCollector;
+    private readonly TaskModeClassifier _taskModeClassifier = new();
+    private readonly RunResultFactory _runResultFactory = new();
 
     private string _promptText = string.Empty;
+    private string _textResult = string.Empty;
+    private string _detailsText = string.Empty;
     private string _statusMessage = "Ready.";
     private string _setupMessage = "Checking setup.";
     private string _outputRoot = AppPaths.DefaultOutputRoot;
     private bool _isBusy;
     private bool _isRecording;
     private bool _voiceInputAvailable;
+    private bool _isPromptExpanded;
+    private bool _isPromptCollapsed;
+    private bool _taskModeManuallySelected;
+    private int _selectedResultTabIndex;
+    private TaskModeChoice _selectedTaskMode;
     private RunContext? _currentRun;
     private OutputItemViewModel? _selectedOutput;
 
@@ -68,6 +78,14 @@ public sealed class MainViewModel : ObservableObject
         SettingsCommand = new AsyncRelayCommand(OpenSettingsAsync);
         OpenOutputsFolderCommand = new RelayCommand(OpenOutputsFolder);
         OpenSelectedOutputCommand = new RelayCommand(OpenSelectedOutput);
+        ExpandPromptCommand = new RelayCommand(() => IsPromptExpanded = true);
+        CollapsePromptCommand = new RelayCommand(() => IsPromptCollapsed = true);
+        AutoModeCommand = new RelayCommand(ResetModeToAuto);
+        CopyTextCommand = new RelayCommand(CopyTextResult);
+        SaveTextAsTxtCommand = new AsyncRelayCommand(() => SaveTextResultAsync(".txt"));
+        SaveTextAsMdCommand = new AsyncRelayCommand(() => SaveTextResultAsync(".md"));
+        ClearResultCommand = new RelayCommand(ClearResult);
+        _selectedTaskMode = TaskModes[0];
     }
 
     public event Func<Task>? SettingsRequested;
@@ -75,6 +93,14 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<InputItemViewModel> Inputs { get; } = [];
     public ObservableCollection<ProgressItemViewModel> ProgressItems { get; } = [];
     public ObservableCollection<OutputItemViewModel> Outputs { get; } = [];
+
+    public IReadOnlyList<TaskModeChoice> TaskModes { get; } =
+    [
+        new(TaskMode.TextQuery, "Text Query"),
+        new(TaskMode.FileJob, "File Job"),
+        new(TaskMode.ExternalAction, "External Action"),
+        new(TaskMode.AdminSensitive, "Admin / Sensitive")
+    ];
 
     public ICommand AddFilesCommand { get; }
     public ICommand AddFolderCommand { get; }
@@ -86,11 +112,42 @@ public sealed class MainViewModel : ObservableObject
     public ICommand SettingsCommand { get; }
     public ICommand OpenOutputsFolderCommand { get; }
     public ICommand OpenSelectedOutputCommand { get; }
+    public ICommand ExpandPromptCommand { get; }
+    public ICommand CollapsePromptCommand { get; }
+    public ICommand AutoModeCommand { get; }
+    public ICommand CopyTextCommand { get; }
+    public ICommand SaveTextAsTxtCommand { get; }
+    public ICommand SaveTextAsMdCommand { get; }
+    public ICommand ClearResultCommand { get; }
 
     public string PromptText
     {
         get => _promptText;
-        set => SetProperty(ref _promptText, value);
+        set
+        {
+            if (SetProperty(ref _promptText, value) && !_taskModeManuallySelected)
+            {
+                SetSelectedTaskMode(_taskModeClassifier.Classify(value), manual: false);
+            }
+        }
+    }
+
+    public string TextResult
+    {
+        get => _textResult;
+        private set
+        {
+            if (SetProperty(ref _textResult, value))
+            {
+                OnPropertyChanged(nameof(HasTextResult));
+            }
+        }
+    }
+
+    public string DetailsText
+    {
+        get => _detailsText;
+        private set => SetProperty(ref _detailsText, value);
     }
 
     public string StatusMessage
@@ -142,6 +199,63 @@ public sealed class MainViewModel : ObservableObject
 
     public string RecordButtonText => IsRecording ? "Recording" : "Record";
 
+    public TaskModeChoice SelectedTaskMode
+    {
+        get => _selectedTaskMode;
+        set
+        {
+            if (value is not null)
+            {
+                SetSelectedTaskMode(value.Mode, manual: true);
+            }
+        }
+    }
+
+    public string ModeStatusText => _taskModeManuallySelected ? "Manual mode" : "Auto mode";
+
+    public bool IsPromptExpanded
+    {
+        get => _isPromptExpanded;
+        private set
+        {
+            if (SetProperty(ref _isPromptExpanded, value))
+            {
+                if (value)
+                {
+                    _isPromptCollapsed = false;
+                    OnPropertyChanged(nameof(IsPromptCollapsed));
+                    OnPropertyChanged(nameof(PromptEditorVisibility));
+                }
+
+                OnPropertyChanged(nameof(PromptEditorHeight));
+                OnPropertyChanged(nameof(PromptEditorVisibility));
+            }
+        }
+    }
+
+    public bool IsPromptCollapsed
+    {
+        get => _isPromptCollapsed;
+        private set
+        {
+            if (SetProperty(ref _isPromptCollapsed, value))
+            {
+                if (value)
+                {
+                    _isPromptExpanded = false;
+                    OnPropertyChanged(nameof(IsPromptExpanded));
+                    OnPropertyChanged(nameof(PromptEditorHeight));
+                }
+
+                OnPropertyChanged(nameof(PromptEditorVisibility));
+            }
+        }
+    }
+
+    public double PromptEditorHeight => IsPromptExpanded ? 240 : 112;
+
+    public Visibility PromptEditorVisibility => IsPromptCollapsed ? Visibility.Collapsed : Visibility.Visible;
+
     public bool VoiceInputAvailable
     {
         get => _voiceInputAvailable;
@@ -167,6 +281,16 @@ public sealed class MainViewModel : ObservableObject
 
     public Visibility SetupBannerVisibility => NeedsSetup ? Visibility.Visible : Visibility.Collapsed;
 
+    public int SelectedResultTabIndex
+    {
+        get => _selectedResultTabIndex;
+        private set => SetProperty(ref _selectedResultTabIndex, value);
+    }
+
+    public bool HasTextResult => !string.IsNullOrWhiteSpace(TextResult);
+
+    public Visibility EmptyFilesVisibility => Outputs.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
     public OutputItemViewModel? SelectedOutput
     {
         get => _selectedOutput;
@@ -176,6 +300,7 @@ public sealed class MainViewModel : ObservableObject
     public async Task InitializeAsync(IEnumerable<string> initialPaths, CancellationToken ct)
     {
         AddInputPaths(initialPaths);
+        ResetModeToAuto();
         await RefreshSetupStatusAsync(ct);
     }
 
@@ -302,9 +427,25 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
+        var taskMode = SelectedTaskMode.Mode;
+        if (taskMode is TaskMode.ExternalAction or TaskMode.AdminSensitive)
+        {
+            var message = _taskModeClassifier.ConfirmationMessage(taskMode, PromptText);
+            if (!_messageService.Confirm(SelectedTaskMode.Label, message))
+            {
+                StatusMessage = "Run cancelled before external or sensitive action.";
+                return;
+            }
+        }
+
         IsBusy = true;
+        IsPromptCollapsed = true;
+        SelectedResultTabIndex = 0;
         ProgressItems.Clear();
         Outputs.Clear();
+        OnPropertyChanged(nameof(EmptyFilesVisibility));
+        TextResult = string.Empty;
+        DetailsText = string.Empty;
         try
         {
             var settings = await _settingsStore.LoadAsync(CancellationToken.None);
@@ -330,6 +471,7 @@ public sealed class MainViewModel : ObservableObject
                 AddProgress("Using existing Codex CLI authentication. The app is not setting CODEX_API_KEY.");
             }
 
+            var sandboxMode = GetSandboxMode(taskMode);
             var runManager = new RunFolderManager(finalOutputRoot: settings.OutputRoot);
             var run = await runManager.CreateRunAsync(PromptText, CancellationToken.None);
             _currentRun = run;
@@ -344,12 +486,18 @@ public sealed class MainViewModel : ObservableObject
                 await File.WriteAllTextAsync(run.TranscriptPath, PromptText);
             }
 
-            var builtPrompt = _promptBuilder.BuildPrompt(PromptText, run);
+            var builtPrompt = _promptBuilder.BuildPrompt(PromptText, run, taskMode);
+            var commandsRun = new List<string>
+            {
+                $"codex exec --cd <run> --skip-git-repo-check --ephemeral --sandbox {sandboxMode.ToCliValue()} --json --output-last-message <run>\\summary.md -"
+            };
+            AddProgress($"Running Codex with {sandboxMode.ToCliValue()} sandbox.");
             await foreach (var codexEvent in _codexRunner.RunAsync(run, builtPrompt, new CodexRunOptions
                            {
                                UseStoredApiKey = settings.CodexAuthMode == CodexAuthMode.UseStoredOpenAiApiKey,
                                OpenAiApiKey = codexApiKey,
-                               DebugLogging = settings.DebugLogging
+                               DebugLogging = settings.DebugLogging,
+                               SandboxMode = sandboxMode
                            }, CancellationToken.None))
             {
                 if (!string.IsNullOrWhiteSpace(codexEvent.Message))
@@ -359,23 +507,44 @@ public sealed class MainViewModel : ObservableObject
             }
 
             var outputs = await _outputCollector.CollectOutputsAsync(run, CancellationToken.None);
-            if (outputs.Count == 0)
-            {
-                throw new InvalidOperationException("Codex finished but did not create any output files.");
-            }
-
             foreach (var output in outputs)
             {
                 Outputs.Add(new OutputItemViewModel(output.FinalPath, output.SizeBytes));
             }
 
+            var warnings = new List<string>();
+            if (taskMode == TaskMode.FileJob && outputs.Count == 0)
+            {
+                warnings.Add("File Job mode completed without generated files.");
+            }
+
+            var result = await _runResultFactory.CreateAsync(
+                run,
+                taskMode,
+                outputs,
+                commandsRun,
+                warnings,
+                [$"Task mode: {SelectedTaskMode.Label}"],
+                [],
+                CancellationToken.None);
+
+            TextResult = result.TextResult;
+            DetailsText = BuildDetailsText(result);
+            OnPropertyChanged(nameof(EmptyFilesVisibility));
             DeleteDirectoryIfExists(run.TempPath);
-            AddProgress($"Created {outputs.Count} output file(s).");
-            StatusMessage = $"Done. Outputs: {run.FinalOutputPath}";
+            AddProgress(outputs.Count == 0 ? "Completed with text result and no generated files." : $"Created {outputs.Count} output file(s).");
+            SelectedResultTabIndex = 0;
+            StatusMessage = outputs.Count == 0
+                ? "Done. Text result is ready."
+                : $"Done. Text result and files are ready. Outputs: {run.FinalOutputPath}";
         }
         catch (Exception ex)
         {
             StatusMessage = "Job failed.";
+            var failed = RunResult.Failed(ex.Message);
+            TextResult = failed.TextResult;
+            DetailsText = BuildDetailsText(failed);
+            SelectedResultTabIndex = 0;
             _messageService.ShowError("Job failed", ex.Message);
         }
         finally
@@ -416,6 +585,113 @@ public sealed class MainViewModel : ObservableObject
         }
 
         _launcher.OpenFile(SelectedOutput.FinalPath);
+    }
+
+    private void ResetModeToAuto()
+    {
+        _taskModeManuallySelected = false;
+        SetSelectedTaskMode(_taskModeClassifier.Classify(PromptText), manual: false);
+    }
+
+    private void SetSelectedTaskMode(TaskMode mode, bool manual)
+    {
+        var choice = TaskModes.First(item => item.Mode == mode);
+        if (SetProperty(ref _selectedTaskMode, choice, nameof(SelectedTaskMode)))
+        {
+            OnPropertyChanged(nameof(ModeStatusText));
+        }
+
+        _taskModeManuallySelected = manual;
+        OnPropertyChanged(nameof(ModeStatusText));
+    }
+
+    private static CodexSandboxMode GetSandboxMode(TaskMode mode)
+    {
+        return mode == TaskMode.TextQuery ? CodexSandboxMode.ReadOnly : CodexSandboxMode.WorkspaceWrite;
+    }
+
+    private void CopyTextResult()
+    {
+        if (!string.IsNullOrWhiteSpace(TextResult))
+        {
+            System.Windows.Clipboard.SetText(TextResult);
+            StatusMessage = "Text result copied.";
+        }
+    }
+
+    private async Task SaveTextResultAsync(string extension)
+    {
+        if (string.IsNullOrWhiteSpace(TextResult))
+        {
+            return;
+        }
+
+        var defaultName = $"simple-job-result-{DateTime.Now:yyyyMMdd-HHmmss}{extension}";
+        var filter = extension.Equals(".md", StringComparison.OrdinalIgnoreCase)
+            ? "Markdown files (*.md)|*.md|Text files (*.txt)|*.txt|All files (*.*)|*.*"
+            : "Text files (*.txt)|*.txt|Markdown files (*.md)|*.md|All files (*.*)|*.*";
+        var path = await _filePicker.PickSaveFileAsync(defaultName, filter);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        await File.WriteAllTextAsync(path, TextResult);
+        StatusMessage = $"Text result saved: {path}";
+    }
+
+    private void ClearResult()
+    {
+        TextResult = string.Empty;
+        DetailsText = string.Empty;
+        Outputs.Clear();
+        ProgressItems.Clear();
+        OnPropertyChanged(nameof(EmptyFilesVisibility));
+        StatusMessage = "Result cleared.";
+    }
+
+    private static string BuildDetailsText(RunResult result)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"Result type: {FormatResultType(result.ResultType)}");
+        builder.AppendLine();
+        AppendSection(builder, "Commands run", result.CommandsRun);
+        AppendSection(builder, "Warnings", result.Warnings);
+        AppendSection(builder, "Assumptions", result.Assumptions);
+        AppendSection(builder, "Files not processed", result.FilesNotProcessed);
+        AppendSection(builder, "Output files", result.OutputFiles.Select(file => file.FinalPath).ToArray());
+        return builder.ToString().TrimEnd();
+    }
+
+    private static void AppendSection(StringBuilder builder, string title, IReadOnlyList<string> values)
+    {
+        builder.AppendLine(title + ":");
+        if (values.Count == 0)
+        {
+            builder.AppendLine("- None");
+        }
+        else
+        {
+            foreach (var value in values)
+            {
+                builder.AppendLine("- " + value);
+            }
+        }
+
+        builder.AppendLine();
+    }
+
+    private static string FormatResultType(ResultType resultType)
+    {
+        return resultType switch
+        {
+            ResultType.Text => "text",
+            ResultType.Files => "files",
+            ResultType.Hybrid => "hybrid",
+            ResultType.ExternalAction => "external_action",
+            ResultType.Failed => "failed",
+            _ => "text"
+        };
     }
 
     private void AddProgress(string message)

@@ -87,86 +87,184 @@
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="2*" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                    <Button Content="{Binding RecordButtonText}"
-                            Command="{Binding RecordCommand}"
-                            IsEnabled="{Binding CanStartRecording}"
-                            ToolTip="{Binding RecordButtonToolTip}" />
-                    <Button Content="Stop"
-                            Command="{Binding StopRecordingCommand}"
-                            IsEnabled="{Binding IsRecording}"
-                            ToolTip="Stop microphone recording, send the temporary WAV file to OpenAI speech-to-text, insert the transcript into the prompt box, and delete the audio file." />
-                    <Button Content="Run Simple Job"
-                            Command="{Binding RunJobCommand}"
-                            IsEnabled="{Binding CanRunJob}"
-                            Background="{StaticResource AccentBrush}"
-                            Foreground="White"
-                            ToolTip="Run Codex CLI in a fresh disposable workspace. Existing CLI authentication uses your cached codex login, including ChatGPT Pro; API-key mode passes CODEX_API_KEY only to this child process." />
-                    <Button Content="Forget this job"
-                            Command="{Binding ForgetJobCommand}"
-                            Margin="0"
-                            ToolTip="Delete the disposable run folder for the current job. Final copied outputs stay in the output folder unless you delete them yourself." />
-                </StackPanel>
+                <DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                        <Button Content="{Binding RecordButtonText}"
+                                Command="{Binding RecordCommand}"
+                                IsEnabled="{Binding CanStartRecording}"
+                                ToolTip="{Binding RecordButtonToolTip}" />
+                        <Button Content="Stop"
+                                Command="{Binding StopRecordingCommand}"
+                                IsEnabled="{Binding IsRecording}"
+                                ToolTip="Stop microphone recording, send the temporary WAV file to OpenAI speech-to-text, insert the transcript into the prompt box, and delete the audio file." />
+                        <Button Content="Run Simple Job"
+                                Command="{Binding RunJobCommand}"
+                                IsEnabled="{Binding CanRunJob}"
+                                Background="{StaticResource AccentBrush}"
+                                Foreground="White"
+                                ToolTip="Run Codex CLI in a fresh disposable workspace. Text Query mode uses a read-only sandbox; file, external, and sensitive modes use workspace-write so requested outputs can be created." />
+                    </StackPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <TextBlock Text="Mode" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="{StaticResource MutedBrush}" />
+                        <ComboBox ItemsSource="{Binding TaskModes}"
+                                  SelectedItem="{Binding SelectedTaskMode}"
+                                  Width="170"
+                                  Margin="0,0,8,0"
+                                  ToolTip="Task mode controls sandboxing and confirmation. Text Query returns direct answers without files. File Job creates outputs. External Action and Admin / Sensitive require confirmation before running." />
+                        <Button Content="Auto"
+                                Command="{Binding AutoModeCommand}"
+                                ToolTip="Re-detect the mode from the visible prompt text." />
+                        <TextBlock Text="{Binding ModeStatusText}" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{StaticResource MutedBrush}" />
+                        <Button Content="Forget this job"
+                                Command="{Binding ForgetJobCommand}"
+                                Margin="0"
+                                ToolTip="Delete the disposable run folder for the current job. Final copied outputs stay in the output folder unless you delete them yourself." />
+                    </StackPanel>
+                </DockPanel>
 
-                <GroupBox Header="Prompt" Grid.Row="1" Padding="8" Margin="0,0,0,10">
-                    <TextBox Text="{Binding PromptText, UpdateSourceTrigger=PropertyChanged}"
-                             AcceptsReturn="True"
-                             TextWrapping="Wrap"
-                             VerticalScrollBarVisibility="Auto"
-                             FontFamily="Consolas"
-                             FontSize="13"
-                             MinHeight="180"
-                             ToolTip="Type or edit the task that will be sent to Codex. You do not need an OpenAI API key for typed prompts when using existing Codex CLI authentication." />
-                </GroupBox>
+                <Border Grid.Row="1"
+                        BorderBrush="#D6DAE0"
+                        BorderThickness="1"
+                        Background="#F7F9FB"
+                        Padding="8"
+                        Margin="0,0,0,8">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <DockPanel Grid.Row="0">
+                            <TextBlock Text="Prompt" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button Content="Expand editor"
+                                        Command="{Binding ExpandPromptCommand}"
+                                        ToolTip="Show a taller prompt editor for long dictated or pasted instructions. The text shown here is only your instruction, not the hidden Simple Job runner instructions." />
+                                <Button Content="Collapse prompt"
+                                        Command="{Binding CollapsePromptCommand}"
+                                        Margin="0"
+                                        ToolTip="Hide the prompt editor so the result tabs have more room. Runs automatically collapse the prompt when they start." />
+                            </StackPanel>
+                        </DockPanel>
+                        <TextBox Grid.Row="1"
+                                 Text="{Binding PromptText, UpdateSourceTrigger=PropertyChanged}"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 FontFamily="Consolas"
+                                 FontSize="13"
+                                 Height="{Binding PromptEditorHeight}"
+                                 Visibility="{Binding PromptEditorVisibility}"
+                                 ToolTip="Type or edit only the task you want done. The app adds its internal safety instructions separately, so those are not shown in this box." />
+                    </Grid>
+                </Border>
 
                 <TextBlock Grid.Row="2" Text="{Binding StatusMessage}" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8" />
 
-                <GroupBox Header="Progress" Grid.Row="3" Padding="8" Margin="0,0,0,10">
-                    <ListBox ItemsSource="{Binding ProgressItems}">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <DockPanel Margin="0,2">
-                                    <TextBlock DockPanel.Dock="Left" Text="{Binding Timestamp, StringFormat={}{0:HH:mm:ss}}" Foreground="{StaticResource MutedBrush}" Width="72" />
-                                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
-                                </DockPanel>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </GroupBox>
+                <TabControl Grid.Row="3"
+                            SelectedIndex="{Binding SelectedResultTabIndex, Mode=OneWay}">
+                    <TabItem Header="Text Result">
+                        <Grid Margin="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                                <Button Content="Copy text"
+                                        Command="{Binding CopyTextCommand}"
+                                        ToolTip="Copy the current text result to the clipboard." />
+                                <Button Content="Save text as .txt"
+                                        Command="{Binding SaveTextAsTxtCommand}"
+                                        ToolTip="Save the current text result to a text file at a location you choose." />
+                                <Button Content="Save text as .md"
+                                        Command="{Binding SaveTextAsMdCommand}"
+                                        ToolTip="Save the current text result to a Markdown file at a location you choose." />
+                                <Button Content="Clear result"
+                                        Command="{Binding ClearResultCommand}"
+                                        Margin="0"
+                                        ToolTip="Clear the displayed text, file list, and progress for this completed run. It does not delete saved output files." />
+                            </StackPanel>
+                            <TextBox Grid.Row="1"
+                                     Text="{Binding TextResult}"
+                                     AcceptsReturn="True"
+                                     IsReadOnly="True"
+                                     TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto"
+                                     HorizontalScrollBarVisibility="Auto"
+                                     FontFamily="Consolas"
+                                     FontSize="13"
+                                     ToolTip="The final useful answer captured from Codex summary.md. A successful job can have this text result even when no output files were generated." />
+                        </Grid>
+                    </TabItem>
 
-                <GroupBox Header="Outputs" Grid.Row="4" Padding="8">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <ListBox Grid.Row="0" ItemsSource="{Binding Outputs}" SelectedItem="{Binding SelectedOutput}">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Margin="2,4">
-                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                        <TextBlock Text="{Binding FinalPath}" FontSize="11" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0">
-                            <Button Content="Open file"
-                                    Command="{Binding OpenSelectedOutputCommand}"
-                                    ToolTip="Open the selected final output file with the Windows default app." />
-                            <Button Content="Open outputs folder"
-                                    Command="{Binding OpenOutputsFolderCommand}"
-                                    Margin="0"
-                                    ToolTip="Open the folder containing final copied outputs for the current job, or the configured output root if no job has completed." />
-                        </StackPanel>
-                    </Grid>
-                </GroupBox>
+                    <TabItem Header="Files">
+                        <Grid Margin="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <ListBox Grid.Row="0" ItemsSource="{Binding Outputs}" SelectedItem="{Binding SelectedOutput}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="2,4">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding FinalPath}" FontSize="11" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock Grid.Row="0"
+                                       Text="No generated files for this run."
+                                       Visibility="{Binding EmptyFilesVisibility}"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       IsHitTestVisible="False" />
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0">
+                                <Button Content="Open file"
+                                        Command="{Binding OpenSelectedOutputCommand}"
+                                        ToolTip="Open the selected final output file with the Windows default app." />
+                                <Button Content="Open outputs folder"
+                                        Command="{Binding OpenOutputsFolderCommand}"
+                                        Margin="0"
+                                        ToolTip="Open the folder containing final copied outputs for the current job, or the configured output root if no job has completed." />
+                            </StackPanel>
+                        </Grid>
+                    </TabItem>
+
+                    <TabItem Header="Progress">
+                        <Grid Margin="8">
+                            <ListBox ItemsSource="{Binding ProgressItems}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,2">
+                                            <TextBlock DockPanel.Dock="Left" Text="{Binding Timestamp, StringFormat={}{0:HH:mm:ss}}" Foreground="{StaticResource MutedBrush}" Width="72" />
+                                            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </TabItem>
+
+                    <TabItem Header="Details">
+                        <Grid Margin="8">
+                            <TextBox Text="{Binding DetailsText}"
+                                     AcceptsReturn="True"
+                                     IsReadOnly="True"
+                                     TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto"
+                                     HorizontalScrollBarVisibility="Auto"
+                                     FontFamily="Consolas"
+                                     FontSize="13"
+                                     ToolTip="Structured run details, including result type, command summary, warnings, assumptions, files not processed, and output files." />
+                        </Grid>
+                    </TabItem>
+                </TabControl>
             </Grid>
         </Grid>
 

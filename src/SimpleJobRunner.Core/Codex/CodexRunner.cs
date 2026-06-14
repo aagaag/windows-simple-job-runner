@@ -23,7 +23,7 @@ public sealed class CodexRunner(CodexCommandBuilder? commandBuilder = null, Code
 
         await File.WriteAllTextAsync(run.PromptPath, prompt, ct);
 
-        var startInfo = _commandBuilder.BuildStartInfo(run);
+        var startInfo = _commandBuilder.BuildStartInfo(run, options.SandboxMode);
         if (options.UseStoredApiKey && !string.IsNullOrWhiteSpace(options.OpenAiApiKey))
         {
             startInfo.Environment["CODEX_API_KEY"] = options.OpenAiApiKey;
