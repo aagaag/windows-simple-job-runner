@@ -22,8 +22,13 @@
 
         <DockPanel Grid.Row="0" Margin="0,0,0,12">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                <Button Content="Open outputs folder" Command="{Binding OpenOutputsFolderCommand}" />
-                <Button Content="Settings" Command="{Binding SettingsCommand}" Margin="0" />
+                <Button Content="Open outputs folder"
+                        Command="{Binding OpenOutputsFolderCommand}"
+                        ToolTip="Open the final user-visible output folder. If a job has completed, this opens that job's output folder; otherwise it opens the configured default output folder." />
+                <Button Content="Settings"
+                        Command="{Binding SettingsCommand}"
+                        Margin="0"
+                        ToolTip="Configure the optional OpenAI API key for voice transcription, choose how Codex authenticates, set the output folder, and control retention/debug options." />
             </StackPanel>
             <StackPanel>
                 <TextBlock Text="Simple Job Runner" FontSize="24" FontWeight="SemiBold" />
@@ -55,9 +60,16 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,8">
-                        <Button Content="Add files" Command="{Binding AddFilesCommand}" />
-                        <Button Content="Add folder" Command="{Binding AddFolderCommand}" />
-                        <Button Content="Clear" Command="{Binding ClearInputsCommand}" Margin="0" />
+                        <Button Content="Add files"
+                                Command="{Binding AddFilesCommand}"
+                                ToolTip="Select one or more files. Simple Job Runner copies them into the disposable run inbox before Codex sees them; originals are not edited." />
+                        <Button Content="Add folder"
+                                Command="{Binding AddFolderCommand}"
+                                ToolTip="Select a folder. Simple Job Runner copies the folder contents into the disposable run inbox before Codex sees them; originals are not edited." />
+                        <Button Content="Clear"
+                                Command="{Binding ClearInputsCommand}"
+                                Margin="0"
+                                ToolTip="Remove selected input paths from this job setup. This does not delete any original files." />
                     </StackPanel>
                     <ListBox Grid.Row="1" ItemsSource="{Binding Inputs}" BorderBrush="#CED4DA">
                         <ListBox.ItemTemplate>
@@ -82,10 +94,24 @@
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                    <Button Content="{Binding RecordButtonText}" Command="{Binding RecordCommand}" />
-                    <Button Content="Stop" Command="{Binding StopRecordingCommand}" />
-                    <Button Content="Run Simple Job" Command="{Binding RunJobCommand}" Background="{StaticResource AccentBrush}" Foreground="White" />
-                    <Button Content="Forget this job" Command="{Binding ForgetJobCommand}" Margin="0" />
+                    <Button Content="{Binding RecordButtonText}"
+                            Command="{Binding RecordCommand}"
+                            IsEnabled="{Binding CanStartRecording}"
+                            ToolTip="{Binding RecordButtonToolTip}" />
+                    <Button Content="Stop"
+                            Command="{Binding StopRecordingCommand}"
+                            IsEnabled="{Binding IsRecording}"
+                            ToolTip="Stop microphone recording, send the temporary WAV file to OpenAI speech-to-text, insert the transcript into the prompt box, and delete the audio file." />
+                    <Button Content="Run Simple Job"
+                            Command="{Binding RunJobCommand}"
+                            IsEnabled="{Binding CanRunJob}"
+                            Background="{StaticResource AccentBrush}"
+                            Foreground="White"
+                            ToolTip="Run Codex CLI in a fresh disposable workspace. Existing CLI authentication uses your cached codex login, including ChatGPT Pro; API-key mode passes CODEX_API_KEY only to this child process." />
+                    <Button Content="Forget this job"
+                            Command="{Binding ForgetJobCommand}"
+                            Margin="0"
+                            ToolTip="Delete the disposable run folder for the current job. Final copied outputs stay in the output folder unless you delete them yourself." />
                 </StackPanel>
 
                 <GroupBox Header="Prompt" Grid.Row="1" Padding="8" Margin="0,0,0,10">
@@ -95,7 +121,8 @@
                              VerticalScrollBarVisibility="Auto"
                              FontFamily="Consolas"
                              FontSize="13"
-                             MinHeight="180" />
+                             MinHeight="180"
+                             ToolTip="Type or edit the task that will be sent to Codex. You do not need an OpenAI API key for typed prompts when using existing Codex CLI authentication." />
                 </GroupBox>
 
                 <TextBlock Grid.Row="2" Text="{Binding StatusMessage}" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8" />
@@ -130,8 +157,13 @@
                             </ListBox.ItemTemplate>
                         </ListBox>
                         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0">
-                            <Button Content="Open file" Command="{Binding OpenSelectedOutputCommand}" />
-                            <Button Content="Open outputs folder" Command="{Binding OpenOutputsFolderCommand}" Margin="0" />
+                            <Button Content="Open file"
+                                    Command="{Binding OpenSelectedOutputCommand}"
+                                    ToolTip="Open the selected final output file with the Windows default app." />
+                            <Button Content="Open outputs folder"
+                                    Command="{Binding OpenOutputsFolderCommand}"
+                                    Margin="0"
+                                    ToolTip="Open the folder containing final copied outputs for the current job, or the configured output root if no job has completed." />
                         </StackPanel>
                     </Grid>
                 </GroupBox>

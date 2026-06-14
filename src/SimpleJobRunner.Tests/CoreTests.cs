@@ -181,6 +181,57 @@ public sealed class CoreTests : IDisposable
         Assert.True(SecretMasker.ContainsLikelyOpenAiKey("value " + FakeOpenAiKey()));
     }
 
+    [Fact]
+    public void SetupStatusCalculator_AllowsTypedJobsWithoutOpenAiApiKeyWhenUsingCliAuth()
+    {
+        var status = SetupStatusCalculator.Evaluate(
+            new AppSettings
+            {
+                OutputRoot = Path.Combine(_root, "outputs"),
+                CodexAuthMode = CodexAuthMode.ExistingCliAuth
+            },
+            openAiApiKeyConfigured: false,
+            ReadyCodex());
+
+        Assert.False(status.NeedsSetup);
+        Assert.False(status.VoiceInputAvailable);
+        Assert.Contains("Ready for typed jobs", status.Message);
+    }
+
+    [Fact]
+    public void SetupStatusCalculator_RequiresKeyWhenCodexApiKeyModeIsSelected()
+    {
+        var status = SetupStatusCalculator.Evaluate(
+            new AppSettings
+            {
+                OutputRoot = Path.Combine(_root, "outputs"),
+                CodexAuthMode = CodexAuthMode.UseStoredOpenAiApiKey
+            },
+            openAiApiKeyConfigured: false,
+            ReadyCodex());
+
+        Assert.True(status.NeedsSetup);
+        Assert.False(status.VoiceInputAvailable);
+        Assert.Contains("API-key mode", status.Message);
+    }
+
+    [Fact]
+    public void SetupStatusCalculator_EnablesVoiceInputWhenOpenAiApiKeyIsSaved()
+    {
+        var status = SetupStatusCalculator.Evaluate(
+            new AppSettings
+            {
+                OutputRoot = Path.Combine(_root, "outputs"),
+                CodexAuthMode = CodexAuthMode.ExistingCliAuth
+            },
+            openAiApiKeyConfigured: true,
+            ReadyCodex());
+
+        Assert.False(status.NeedsSetup);
+        Assert.True(status.VoiceInputAvailable);
+        Assert.Contains("Voice transcription is enabled", status.Message);
+    }
+
     private RunFolderManager CreateManager()
     {
         return new RunFolderManager(
@@ -190,6 +241,8 @@ public sealed class CoreTests : IDisposable
     }
 
     private static string FakeOpenAiKey() => "sk-" + "testsecretsecretsecretsecret";
+
+    private static CodexAvailability ReadyCodex() => new(true, "codex-cli test", [], null);
 
     private RunContext TestRun()
     {

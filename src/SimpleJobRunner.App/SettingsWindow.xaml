@@ -17,40 +17,73 @@
             <StackPanel>
                 <TextBlock Text="OpenAI API key" FontSize="18" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding MaskedApiKey}" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,8" />
-                <PasswordBox x:Name="ApiKeyBox" PasswordChanged="ApiKeyBox_PasswordChanged" Margin="0,4,0,8" />
+                <PasswordBox x:Name="ApiKeyBox"
+                             PasswordChanged="ApiKeyBox_PasswordChanged"
+                             Margin="0,4,0,8"
+                             ToolTip="Optional for typed jobs. Required only for Record/voice transcription, and for Codex API-key mode. The key is stored in Windows Credential Locker, not in settings files or installers." />
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,18">
-                    <Button Content="Set / Replace key" Command="{Binding SaveKeyCommand}" />
-                    <Button Content="Test key" Command="{Binding TestKeyCommand}" />
-                    <Button Content="Delete key" Command="{Binding DeleteKeyCommand}" Margin="0" />
+                    <Button Content="Set / Replace key"
+                            Command="{Binding SaveKeyCommand}"
+                            ToolTip="Save the entered OpenAI API key to Windows Credential Locker for the current Windows user. The full key is not shown again after saving." />
+                    <Button Content="Test key"
+                            Command="{Binding TestKeyCommand}"
+                            ToolTip="Call the OpenAI API with the entered key, or the stored key if the box is empty, to verify that it works. This is not required for typed Codex jobs using existing CLI authentication." />
+                    <Button Content="Delete key"
+                            Command="{Binding DeleteKeyCommand}"
+                            Margin="0"
+                            ToolTip="Remove the saved OpenAI API key from Windows Credential Locker. Typed jobs can still run through existing Codex CLI authentication." />
                 </StackPanel>
 
                 <TextBlock Text="Speech model" FontWeight="SemiBold" />
-                <ComboBox ItemsSource="{Binding SpeechModels}" SelectedItem="{Binding SelectedSpeechModel}" />
+                <ComboBox ItemsSource="{Binding SpeechModels}"
+                          SelectedItem="{Binding SelectedSpeechModel}"
+                          ToolTip="Choose the OpenAI speech-to-text model used only by the Record button. gpt-4o-transcribe is the default quality option; gpt-4o-mini-transcribe is the lower-cost option." />
 
                 <TextBlock Text="Codex authentication" FontWeight="SemiBold" />
-                <ComboBox ItemsSource="{Binding CodexAuthModes}" SelectedItem="{Binding SelectedCodexAuthMode}" />
+                <ComboBox ItemsSource="{Binding CodexAuthModes}"
+                          SelectedItem="{Binding SelectedCodexAuthMode}"
+                          ToolTip="Use existing Codex CLI authentication to rely on codex login, including ChatGPT Pro/Plus. Use stored OpenAI API key only if you want this app to set CODEX_API_KEY for the single codex exec child process, which uses API billing." />
 
                 <TextBlock Text="Output folder" FontWeight="SemiBold" />
                 <DockPanel Margin="0,4,0,8">
-                    <Button DockPanel.Dock="Right" Content="Browse" Command="{Binding BrowseOutputFolderCommand}" Margin="8,0,0,0" />
-                    <TextBox Text="{Binding OutputRoot, UpdateSourceTrigger=PropertyChanged}" Margin="0" />
+                    <Button DockPanel.Dock="Right"
+                            Content="Browse"
+                            Command="{Binding BrowseOutputFolderCommand}"
+                            Margin="8,0,0,0"
+                            ToolTip="Choose the folder where final copied outputs are kept after each job." />
+                    <TextBox Text="{Binding OutputRoot, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0"
+                             ToolTip="Final deliverables are copied here after Codex writes them to the disposable run folder. Forgetting a job does not delete this folder." />
                 </DockPanel>
 
                 <TextBlock Text="Retention" FontWeight="SemiBold" />
                 <StackPanel Orientation="Horizontal" Margin="0,4,0,10">
-                    <TextBox Width="80" Text="{Binding RunRetentionDays, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBox Width="80"
+                             Text="{Binding RunRetentionDays, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="Number of days to keep disposable run folders by default. Final output folders are kept until you delete them." />
                     <TextBlock Text="days to keep run folders by default" VerticalAlignment="Center" Margin="8,0,0,0" />
                 </StackPanel>
 
-                <CheckBox Content="Keep transcript files in run folders" IsChecked="{Binding RetainTranscripts}" Margin="0,0,0,8" />
-                <CheckBox Content="Keep Codex JSONL debug logs" IsChecked="{Binding DebugLogging}" Margin="0,0,0,8" />
+                <CheckBox Content="Keep transcript files in run folders"
+                          IsChecked="{Binding RetainTranscripts}"
+                          Margin="0,0,0,8"
+                          ToolTip="When enabled, the edited prompt/transcript is persisted in the run folder. Leave this off if prompts may contain sensitive information." />
+                <CheckBox Content="Keep Codex JSONL debug logs"
+                          IsChecked="{Binding DebugLogging}"
+                          Margin="0,0,0,8"
+                          ToolTip="When enabled, Codex JSONL progress is written to events.jsonl in the run folder. Leave this off unless troubleshooting." />
                 <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
             </StackPanel>
         </ScrollViewer>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button Content="Save settings" Command="{Binding SaveSettingsCommand}" />
-            <Button Content="Close" Command="{Binding CloseCommand}" Margin="0" />
+            <Button Content="Save settings"
+                    Command="{Binding SaveSettingsCommand}"
+                    ToolTip="Save non-secret settings to the local settings file. API keys are saved separately in Windows Credential Locker." />
+            <Button Content="Close"
+                    Command="{Binding CloseCommand}"
+                    Margin="0"
+                    ToolTip="Close Settings. Unsaved non-secret setting changes are discarded unless you clicked Save settings." />
         </StackPanel>
     </Grid>
 </Window>

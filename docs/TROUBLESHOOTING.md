@@ -6,7 +6,9 @@ Install Codex CLI using the official OpenAI Codex instructions and make sure `co
 
 ## API Key Missing
 
-Open Settings, enter the OpenAI API key, click **Set / Replace key**, then **Test key**.
+An OpenAI API key is not required for typed jobs that use existing Codex CLI authentication. It is required only for **Record** voice transcription or for Codex API-key mode.
+
+To enable those features, open Settings, enter the OpenAI API key, click **Set / Replace key**, then **Test key**.
 
 ## Transcription Fails
 
@@ -21,6 +23,14 @@ codex exec --help
 ```
 
 The app expects `codex exec` to support `--cd`, `--skip-git-repo-check`, `--ephemeral`, `--sandbox`, `--json`, and `--output-last-message`.
+
+If you are using existing Codex CLI authentication, run:
+
+```powershell
+codex login
+```
+
+Use ChatGPT login if you want Codex to use your ChatGPT plan entitlement.
 
 ## No Output Created
 

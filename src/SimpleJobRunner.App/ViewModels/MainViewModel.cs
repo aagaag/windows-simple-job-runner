@@ -29,6 +29,7 @@ public sealed class MainViewModel : ObservableObject
     private string _outputRoot = AppPaths.DefaultOutputRoot;
     private bool _isBusy;
     private bool _isRecording;
+    private bool _voiceInputAvailable;
     private RunContext? _currentRun;
     private OutputItemViewModel? _selectedOutput;
 
@@ -118,6 +119,8 @@ public sealed class MainViewModel : ObservableObject
             if (SetProperty(ref _isBusy, value))
             {
                 OnPropertyChanged(nameof(BusyVisibility));
+                OnPropertyChanged(nameof(CanStartRecording));
+                OnPropertyChanged(nameof(CanRunJob));
             }
         }
     }
@@ -130,6 +133,7 @@ public sealed class MainViewModel : ObservableObject
             if (SetProperty(ref _isRecording, value))
             {
                 OnPropertyChanged(nameof(RecordButtonText));
+                OnPropertyChanged(nameof(CanStartRecording));
             }
         }
     }
@@ -137,6 +141,27 @@ public sealed class MainViewModel : ObservableObject
     public bool NeedsSetup { get; private set; }
 
     public string RecordButtonText => IsRecording ? "Recording" : "Record";
+
+    public bool VoiceInputAvailable
+    {
+        get => _voiceInputAvailable;
+        private set
+        {
+            if (SetProperty(ref _voiceInputAvailable, value))
+            {
+                OnPropertyChanged(nameof(CanStartRecording));
+                OnPropertyChanged(nameof(RecordButtonToolTip));
+            }
+        }
+    }
+
+    public bool CanStartRecording => !IsBusy && !IsRecording && VoiceInputAvailable;
+
+    public bool CanRunJob => !IsBusy;
+
+    public string RecordButtonToolTip => VoiceInputAvailable
+        ? "Record microphone audio, send it to OpenAI speech-to-text, insert the transcript into the prompt box, then let you edit before running. Audio is deleted after transcription."
+        : "Voice transcription requires an OpenAI API key saved in Settings. You can still type a prompt and run jobs through existing Codex CLI authentication, including ChatGPT Pro.";
 
     public Visibility BusyVisibility => IsBusy ? Visibility.Visible : Visibility.Collapsed;
 
@@ -174,26 +199,12 @@ public sealed class MainViewModel : ObservableObject
         OutputRoot = settings.OutputRoot;
         var keyConfigured = !string.IsNullOrWhiteSpace(await _credentialStore.GetOpenAiApiKeyAsync(ct));
         var codex = await _codexAvailabilityService.CheckAsync(ct);
+        var setup = SetupStatusCalculator.Evaluate(settings, keyConfigured, codex);
 
-        NeedsSetup = !keyConfigured || !codex.SupportsRequiredExecFlags;
+        NeedsSetup = setup.NeedsSetup;
+        VoiceInputAvailable = setup.VoiceInputAvailable;
+        SetupMessage = setup.Message;
         OnPropertyChanged(nameof(SetupBannerVisibility));
-
-        if (!codex.IsAvailable)
-        {
-            SetupMessage = "Setup needed: Codex CLI was not found on PATH.";
-        }
-        else if (!codex.SupportsRequiredExecFlags)
-        {
-            SetupMessage = "Setup needed: Codex CLI does not report all required non-interactive flags.";
-        }
-        else if (!keyConfigured)
-        {
-            SetupMessage = "Setup needed: add an OpenAI API key for speech-to-text.";
-        }
-        else
-        {
-            SetupMessage = $"Ready. Outputs: {OutputRoot}";
-        }
     }
 
     public async Task OpenSettingsAsync()
@@ -222,6 +233,14 @@ public sealed class MainViewModel : ObservableObject
     {
         if (IsBusy || IsRecording)
         {
+            return;
+        }
+
+        if (!VoiceInputAvailable)
+        {
+            _messageService.ShowError(
+                "OpenAI API key required for voice",
+                "Voice transcription uses the OpenAI speech-to-text API and needs an API key saved in Settings. You can still type a prompt and run Codex jobs through existing Codex CLI authentication.");
             return;
         }
 
@@ -303,6 +322,12 @@ public sealed class MainViewModel : ObservableObject
                 {
                     throw new InvalidOperationException("OpenAI API key is missing.");
                 }
+
+                AddProgress("Using stored OpenAI API key for this Codex child process only.");
+            }
+            else
+            {
+                AddProgress("Using existing Codex CLI authentication. The app is not setting CODEX_API_KEY.");
             }
 
             var runManager = new RunFolderManager(finalOutputRoot: settings.OutputRoot);

@@ -56,8 +56,8 @@ public sealed class SettingsViewModel : ObservableObject
 
     public IReadOnlyList<CodexAuthModeChoice> CodexAuthModes { get; } =
     [
-        new(CodexAuthMode.ExistingCliAuth, "Use existing Codex CLI authentication"),
-        new(CodexAuthMode.UseStoredOpenAiApiKey, "Pass stored key to codex exec")
+        new(CodexAuthMode.ExistingCliAuth, "Use existing Codex CLI authentication (ChatGPT login)"),
+        new(CodexAuthMode.UseStoredOpenAiApiKey, "Pass stored OpenAI API key to codex exec")
     ];
 
     public ICommand SaveSettingsCommand { get; }

@@ -22,7 +22,8 @@ Simple Job Runner is a Windows desktop utility for one-off Codex file jobs. It l
 
 - Windows 11 first, recent Windows 10 best effort.
 - Codex CLI installed and available on `PATH`.
-- An OpenAI API key for speech-to-text.
+- Codex CLI authentication. `codex login` can use ChatGPT login, including ChatGPT Pro/Plus.
+- Optional: an OpenAI API key for in-app speech-to-text.
 
 ## Build
 
@@ -42,7 +43,9 @@ artifacts/release/SHA256SUMS.txt
 
 ## First Launch
 
-On first launch the app checks Codex CLI, checks the stored OpenAI API key, and opens Settings if setup is incomplete. Store the API key from Settings. It is saved in Windows Credential Locker under:
+On first launch the app checks Codex CLI and opens Settings only if required setup is incomplete. Typed jobs can run without an OpenAI API key when Codex CLI is already authenticated with `codex login`.
+
+The OpenAI API key is optional unless you want the **Record** button or you explicitly choose Codex API-key mode. If saved, it is stored in Windows Credential Locker under:
 
 ```text
 Resource: SimpleJobRunner.OpenAI
@@ -52,7 +55,7 @@ User name: openai-api-key
 ## Running A Job
 
 1. Add files or a folder, or drag files onto the app.
-2. Record a voice prompt or type directly.
+2. Type a prompt directly, or record a voice prompt if an OpenAI API key is configured.
 3. Edit the prompt.
 4. Click **Run Simple Job**.
 5. Open generated files from the Outputs panel or from the output folder.
@@ -73,4 +76,4 @@ Inputs are copied into `inbox`, temporary work goes in `temp`, Codex writes deli
 
 ## Security And Privacy
 
-Audio is sent to OpenAI for transcription. Codex CLI may send prompts and relevant file context to OpenAI to complete the job. Treat input files as confidential and review `docs/PRIVACY.md` and `docs/SECRETS.md` before use.
+Audio is sent to OpenAI only when you use **Record**. Codex CLI may send prompts and relevant file context to OpenAI to complete the job. Treat input files as confidential and review `docs/PRIVACY.md` and `docs/SECRETS.md` before use.
