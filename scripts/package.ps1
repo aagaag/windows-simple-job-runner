@@ -1,7 +1,7 @@
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
-    [string]$Version = "0.3.0"
+    [string]$Version = "0.3.1"
 )
 
 $ErrorActionPreference = "Stop"
@@ -136,6 +136,41 @@ function New-GeneratedWixFiles {
     Set-Content -LiteralPath $OutputPath -Value $lines -Encoding utf8
 }
 
+function Assert-SelfContainedPublish {
+    param([string]$PublishDirectory)
+
+    $requiredFiles = @(
+        "SimpleJobRunner.App.exe",
+        "SimpleJobRunner.App.dll",
+        "SimpleJobRunner.App.runtimeconfig.json",
+        "hostfxr.dll",
+        "hostpolicy.dll",
+        "coreclr.dll",
+        "PresentationFramework.dll",
+        "PresentationCore.dll",
+        "WindowsBase.dll"
+    )
+
+    $missingFiles = @(
+        foreach ($file in $requiredFiles) {
+            if (-not (Test-Path -LiteralPath (Join-Path $PublishDirectory $file))) {
+                $file
+            }
+        }
+    )
+
+    if ($missingFiles.Count -gt 0) {
+        throw "Self-contained publish is missing required runtime files: $($missingFiles -join ', ')"
+    }
+
+    $runtimeConfigPath = Join-Path $PublishDirectory "SimpleJobRunner.App.runtimeconfig.json"
+    $runtimeConfig = Get-Content -LiteralPath $runtimeConfigPath -Raw | ConvertFrom-Json
+    $includedFrameworks = @($runtimeConfig.runtimeOptions.includedFrameworks | ForEach-Object { $_.name })
+    if ($includedFrameworks -notcontains "Microsoft.WindowsDesktop.App") {
+        throw "Self-contained publish is missing Microsoft.WindowsDesktop.App in runtimeconfig.json."
+    }
+}
+
 $artifactsRoot = Join-Path $repoRoot "artifacts"
 $publishRoot = Join-Path $artifactsRoot "publish"
 $publishDir = Join-Path $publishRoot "SimpleJobRunner"
@@ -160,6 +195,7 @@ Invoke-Native dotnet publish .\src\SimpleJobRunner.App\SimpleJobRunner.App.cspro
     "-p:FileVersion=$Version.0"
 
 Copy-Item -LiteralPath .\README-portable.txt -Destination (Join-Path $publishDir "README-portable.txt") -Force
+Assert-SelfContainedPublish -PublishDirectory $publishDir
 
 if (Test-Path $zipPath) {
     Remove-Item -LiteralPath $zipPath -Force

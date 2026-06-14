@@ -19,7 +19,7 @@ It is for Windows users who want a repeatable front end for one-off Codex tasks:
 ## Quick Start
 
 1. Install Codex CLI and authenticate it with `codex login`.
-2. Install Simple Job Runner from the MSI or extract the portable zip.
+2. Install Simple Job Runner from the latest MSI release or extract the portable zip.
 3. Launch the app and review Settings.
 4. Use **Safe test** to load a harmless Text Query.
 5. Click **Run Simple Job**.
@@ -153,6 +153,8 @@ Listing is normally a Text Query. Deleting, installing, changing services, modif
 ## Troubleshooting
 
 If Codex CLI is missing, install and authenticate Codex CLI, then restart the app or reopen Settings. If voice transcription is disabled, save an OpenAI API key in Settings or type prompts manually.
+
+If Windows shows "You must install .NET Desktop Runtime to run this application", install the latest `SimpleJobRunnerSetup-x64.msi` release. The current MSI is self-contained and upgrades earlier broken installs that were missing bundled runtime files.
 
 The **Details** tab shows run ID, run folder, mode, sandbox, counts, Codex exit code, elapsed time, and command summary. The **Diagnostics** tab shows sanitized diagnostic text and can export a diagnostics bundle.
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 - Installer Runtime Fix
+
+- Published a higher-version MSI so Windows upgrades earlier broken 0.3.0 installs.
+- Added package validation that fails if the self-contained Windows desktop runtime files are missing from the publish folder.
+- Clarified installation troubleshooting for the .NET Desktop Runtime dialog.
+
 ## 0.3.0 - Skeptical Friend Hardening
 
 - Added clearer app positioning and safety language.
