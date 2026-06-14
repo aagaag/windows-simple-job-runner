@@ -16,10 +16,12 @@ Select files/folders
   -> record/transcribe or type prompt
   -> write run AGENTS.md
   -> classify task mode
+  -> create run.json metadata
   -> build Codex prompt
   -> codex exec in run folder with read-only or workspace-write sandbox
   -> capture final assistant message to run\summary.md
   -> collect run\outputs when files exist
+  -> update run lifecycle and diagnostics
   -> render RunResult text and optional files
 ```
 
@@ -37,3 +39,15 @@ Text Query mode uses the least permissive `read-only` sandbox where possible. Fi
 - `CodexRunner`: runs `codex exec` through `ProcessStartInfo` without PowerShell.
 - `OutputCollector`: validates and copies non-empty deliverables to the final output folder.
 - `RunResultFactory`: reads `summary.md`, combines optional output files and warnings, and produces the structured result displayed by the UI.
+- `RunMetadataStore`: writes machine-readable `run.json` lifecycle metadata.
+- `RunDiagnostics`: writes and exports sanitized diagnostic information.
+- `RunRetentionManager`: removes temp files after successful runs and purges old disposable run folders.
+- `FailureExplanation`: turns exceptions into user-readable failure sections with technical details.
+
+## Run Lifecycle
+
+Runs are represented with `Created`, `Preparing`, `Transcribing`, `ReadyToRun`, `RunningCodex`, `CollectingOutputs`, `Completed`, `Failed`, and `Forgotten` statuses. The current implementation writes run metadata during app-driven execution; voice transcription still happens before a run folder exists.
+
+## Diagnostics
+
+Diagnostics are sanitized with `SecretMasker` before display or export. Diagnostic bundles include metadata, progress, summary, diagnostics, and environment details, but not input files or output files.

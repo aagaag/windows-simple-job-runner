@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0 - Skeptical Friend Hardening
+
+- Added clearer app positioning and safety language.
+- Added run lifecycle metadata in `run.json`.
+- Improved diagnostics and error visibility with a Diagnostics tab and sanitized diagnostics export.
+- Expanded secret redaction for OpenAI keys, GitHub tokens, bearer tokens, passwords, and sensitive assignments.
+- Added retention and cleanup controls for prompts, transcripts, diagnostics, old runs, and forgotten jobs.
+- Added mode-based confirmation copy for external and admin/sensitive actions.
+- Added a safe first-run test prompt.
+- Improved audit trail and command visibility in run details.
+- Improved Windows installer/shareability documentation.
+
 ## 0.2.0
 
 - Added a compact prompt editor with expand/collapse controls and automatic collapse when a run starts.

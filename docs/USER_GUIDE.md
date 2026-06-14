@@ -8,9 +8,11 @@ Open Settings and configure:
 - Speech model.
 - Codex authentication mode.
 - Output folder.
-- Retention options.
+- Retention, diagnostics, and privacy options.
 
 Use **Test key** to verify the OpenAI API key if you choose to store one.
+
+The **Safe test** button fills the prompt with a harmless Text Query: "Say hello and report the current working directory. Do not create files."
 
 ## Codex Authentication
 
@@ -23,6 +25,12 @@ Choose **Pass stored OpenAI API key to codex exec** only if you want Simple Job 
 Click **Record**, speak the task, then click **Stop**. The app uploads the audio file to OpenAI speech-to-text, deletes the audio file after transcription, and inserts the transcript into the prompt box. Review and edit the prompt before running.
 
 The Record button is disabled until an OpenAI API key is saved in Settings. You can always type a prompt manually and run a job through existing Codex CLI authentication.
+
+## Safety And Sensitive Data
+
+Simple Job Runner is a Windows front end for disposable Codex-powered tasks. It is not a security boundary, not a compliance system, and not a substitute for reviewing commands or outputs before using them.
+
+Do not use this app with patient-identifiable information, medical records, client-confidential files, legal matters, financial records, trade secrets, or regulated data unless you have confirmed that your use is permitted by your organization, account terms, data-retention settings, jurisdiction, and professional obligations.
 
 ## Prompt Editor
 
@@ -58,3 +66,15 @@ Final outputs are copied to the configured output folder. The default is:
 ```
 
 Use **Forget this job** to delete the disposable run folder. Final copied outputs are kept.
+
+## Details And Diagnostics
+
+The **Details** tab shows run ID, run folder, mode, sandbox, input and output counts, Codex exit code, elapsed time, metadata path, diagnostics path, command summary, warnings, assumptions, and output files.
+
+The **Diagnostics** tab shows sanitized troubleshooting information. Use **Export diagnostics bundle** to save sanitized `run.json`, progress, summary, diagnostics, and environment details. Input files and output files are not included.
+
+## Retention And Cleanup
+
+By default, successful runs delete temp files and do not retain prompts or transcripts. Diagnostics are kept briefly for troubleshooting. Outputs remain until you delete them.
+
+Settings can control prompt retention, transcript retention, debug event logs, diagnostics retention, automatic old-run purge, Privacy Mode, and whether **Forget this job** preserves output files.

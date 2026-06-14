@@ -1,38 +1,38 @@
-# Simple Job Runner
+# Simple Job Runner for Windows
 
-Simple Job Runner is a Windows desktop utility for one-off Codex jobs. It lets you ask for direct text answers, select local files, dictate a task, transcribe the task with OpenAI speech-to-text, run Codex CLI in an ephemeral local workspace, and collect generated files without creating Codex app sidebar clutter or per-job GitHub repositories.
+## What It Is
 
-## What It Does
+Simple Job Runner is a small Windows utility for disposable Codex-powered local tasks. It is a focused workflow layer around Codex for quick text results, file generation, local file inspection, and one-off administrative tasks without creating Codex project/sidebar clutter.
 
-- Stages selected files and folders into a disposable run folder.
-- Records push-to-stop microphone audio and transcribes it with OpenAI speech-to-text.
-- Shows the transcript in a compact editable prompt box before any Codex run starts.
-- Runs `codex exec` non-interactively with `--skip-git-repo-check`, `--ephemeral`, `--json`, and `--output-last-message`.
-- Captures the final Codex answer in `run\summary.md` and displays it in the Text Result tab.
-- Copies generated files to `Documents\Simple Job Outputs` by default when a job creates files.
-- Lets the user forget a job by deleting the disposable run folder while keeping final outputs.
+It can stage selected files into a disposable workspace, run `codex exec`, capture the final answer as a Text Result, and copy generated files to a user-visible output folder.
 
-## What It Does Not Do
+## What It Is Not
 
-- It does not create Codex app projects, persistent chat history, per-job Git repositories, or per-job GitHub repositories.
-- It does not edit original input files.
-- It does not store runtime API keys in files, logs, installers, or source control.
-- It does not bundle Codex CLI.
+Simple Job Runner is not an alternative to Codex, not a security boundary, not a compliance system, and not a substitute for reviewing commands or outputs before using them.
 
-## Prerequisites
+It does not create Codex app projects, persistent chat history, per-job Git repositories, or per-job GitHub repositories. It does not edit original input files and does not bundle runtime API keys.
 
-- Windows 11 first, recent Windows 10 best effort.
+## Who It Is For
+
+It is for Windows users who want a repeatable front end for one-off Codex tasks: quick text answers, reports, file conversions, summaries, local inventories, and carefully confirmed external or administrative actions.
+
+## Quick Start
+
+1. Install Codex CLI and authenticate it with `codex login`.
+2. Install Simple Job Runner from the MSI or extract the portable zip.
+3. Launch the app and review Settings.
+4. Use **Safe test** to load a harmless Text Query.
+5. Click **Run Simple Job**.
+6. Read the answer in **Text Result**.
+
+## Requirements
+
+- Windows 11 first; recent Windows 10 best effort.
 - Codex CLI installed and available on `PATH`.
 - Codex CLI authentication. `codex login` can use ChatGPT login, including ChatGPT Pro/Plus.
-- Optional: an OpenAI API key for in-app speech-to-text.
+- Optional: an OpenAI API key for in-app speech-to-text or Codex API-key mode.
 
-## Build
-
-```powershell
-./scripts/build.ps1
-./scripts/test.ps1
-./scripts/package.ps1
-```
+## Installation
 
 Package outputs are written to:
 
@@ -42,55 +42,149 @@ artifacts/release/SimpleJobRunnerPortable-win-x64.zip
 artifacts/release/SHA256SUMS.txt
 ```
 
-## First Launch
+The MSI creates a Start Menu entry and can optionally create a desktop shortcut:
 
-On first launch the app checks Codex CLI and opens Settings only if required setup is incomplete. Typed jobs can run without an OpenAI API key when Codex CLI is already authenticated with `codex login`.
+```powershell
+msiexec /i SimpleJobRunnerSetup-x64.msi INSTALLDESKTOPSHORTCUT=1
+```
 
-The OpenAI API key is optional unless you want the **Record** button or you explicitly choose Codex API-key mode. If saved, it is stored in Windows Credential Locker under:
+The portable zip runs from the extracted folder.
+
+## First-Run Setup
+
+On launch, the app checks whether Codex CLI is available and supports the required non-interactive flags. If setup is incomplete, it opens Settings and explains what is missing.
+
+Settings lets you:
+
+- choose existing Codex CLI authentication or API-key mode;
+- set, test, or remove the optional OpenAI transcription key;
+- choose the output folder;
+- choose retention and privacy defaults;
+- purge old disposable run folders.
+
+## How To Run A Text Query
+
+Use **Text Query** for direct answers, status checks, local queries, calculations, inventories, and lists. This mode prefers the `read-only` Codex sandbox and can succeed with no generated files.
+
+Example:
+
+```text
+How much free space is available on my local disks? Return a concise table.
+```
+
+## How To Run A File Job
+
+Use **File Job** for generated files, conversions, reports, spreadsheets, CSVs, Markdown, PDFs, and document jobs. This mode uses `workspace-write` and expects requested deliverables in `run\outputs`.
+
+Example:
+
+```text
+Read the files in inbox and make an Excel spreadsheet in outputs with date, amount, counterparty, and notes.
+```
+
+## How Outputs Work
+
+Every run should produce a text result. The **Text Result** tab is the primary output and supports copy, save as `.txt`, save as `.md`, and clear.
+
+The **Files** tab lists generated files only when they exist. Text-only runs can complete successfully with an empty Files tab.
+
+Generated files are copied from the disposable run folder to:
+
+```text
+%USERPROFILE%\Documents\Simple Job Outputs
+```
+
+unless you choose another output folder.
+
+## How Cleanup Works
+
+Each job gets a run folder under:
+
+```text
+%LOCALAPPDATA%\SimpleJobRunner\runs
+```
+
+The run folder contains `inbox`, `outputs`, `temp`, `run.json`, `summary.md`, and diagnostics when available. Successful runs delete temp files and, by default, do not retain prompt or transcript files. Final output files are kept until you delete them.
+
+**Forget this job** deletes the disposable run folder. Output files are preserved by default unless you disable that setting.
+
+## How Secrets Are Stored
+
+The optional OpenAI API key is stored per Windows user in Windows Credential Locker under:
 
 ```text
 Resource: SimpleJobRunner.OpenAI
 User name: openai-api-key
 ```
 
-## Running A Job
+The full key is not displayed after saving. The app redacts likely OpenAI keys, GitHub tokens, bearer tokens, passwords, and sensitive variable assignments from diagnostics and logs.
 
-1. Add files or a folder, or drag files onto the app.
-2. Type a prompt directly, or record a voice prompt if an OpenAI API key is configured.
-3. Edit the prompt.
-4. Click **Run Simple Job**.
-5. Read the final answer in **Text Result**.
-6. Open generated files from **Files** when the job created files.
+## Permission Modes
 
-## Task Modes
+- **Text Query**: direct text result, prefers `read-only`.
+- **File Job**: generated files in the disposable workspace, uses `workspace-write`.
+- **External Action**: network or persistent external side effects, requires confirmation.
+- **Admin / Sensitive**: deletes, service changes, package installs, system configuration, or elevation, requires confirmation.
 
-Simple Job Runner auto-selects a mode from the visible prompt. You can override it before running:
+The app does not use full system access by default.
 
-- **Text Query**: direct answers, status checks, local queries, calculations, inventories, and lists. Uses the `read-only` Codex sandbox where possible and does not require output files.
-- **File Job**: file generation, conversion, merge, report, Excel, CSV, Markdown, PDF, or document tasks. Uses `workspace-write` and expects final files in `run\outputs`.
-- **External Action**: GitHub repository creation, uploads, publishing, posting, sending, or external API calls. Requires confirmation before running.
-- **Admin / Sensitive**: package installation, service changes, deletes, system configuration, elevation, or other sensitive changes. Requires confirmation before running.
+## External Actions And Confirmations
 
-## Text Results Vs. File Results
+Prompts that appear to create or modify external resources show a confirmation before Codex runs.
 
-Every run is expected to produce a text result. Simple answers can finish successfully with no files at all. File-producing jobs also produce a short text result that summarizes what was created and where it was copied.
-
-The **Text Result** tab is the primary output. It includes buttons to copy the answer, save it as `.txt`, save it as `.md`, or clear the displayed result. The **Files** tab is secondary and may be empty for successful Text Query runs.
-
-## Ephemerality
-
-Each job gets a fresh run folder under:
+Example:
 
 ```text
-%LOCALAPPDATA%\SimpleJobRunner\runs
+Create a private GitHub repository called test-project, but ask for confirmation before creating it.
 ```
 
-Inputs are copied into `inbox`, temporary work goes in `temp`, Codex writes requested deliverables to `outputs`, and the final text answer is captured in `summary.md`. Final user-visible files are copied to:
+## Admin/Sensitive Tasks
+
+Administrative prompts require explicit confirmation and should be reviewed carefully.
+
+Example:
 
 ```text
-%USERPROFILE%\Documents\Simple Job Outputs
+List the incremental backups from the last three weeks in this selected backup folder.
 ```
 
-## Security And Privacy
+Listing is normally a Text Query. Deleting, installing, changing services, modifying system configuration, or touching files outside the disposable workspace is treated as sensitive.
 
-Audio is sent to OpenAI only when you use **Record**. Codex CLI may send prompts and relevant file context to OpenAI to complete the job. Treat input files as confidential and review `docs/PRIVACY.md` and `docs/SECRETS.md` before use.
+## Troubleshooting
+
+If Codex CLI is missing, install and authenticate Codex CLI, then restart the app or reopen Settings. If voice transcription is disabled, save an OpenAI API key in Settings or type prompts manually.
+
+The **Details** tab shows run ID, run folder, mode, sandbox, counts, Codex exit code, elapsed time, and command summary. The **Diagnostics** tab shows sanitized diagnostic text and can export a diagnostics bundle.
+
+## Privacy And Sensitive Data
+
+Do not use this app with patient-identifiable information, medical records, client-confidential files, legal matters, financial records, trade secrets, or regulated data unless you have confirmed that your use is permitted by your organization, account terms, data-retention settings, jurisdiction, and professional obligations.
+
+Codex CLI may send prompts and relevant file context to OpenAI to perform the task. Review results before relying on them.
+
+## For Technical Users: How It Calls Codex
+
+Simple Job Runner invokes Codex with a command shaped like:
+
+```powershell
+codex exec `
+  --cd "<runDir>" `
+  --skip-git-repo-check `
+  --ephemeral `
+  --sandbox "<read-only or workspace-write>" `
+  --json `
+  --output-last-message "<runDir>\summary.md" `
+  -
+```
+
+It passes prompts through stdin, keeps jobs outside Git repositories, captures `summary.md` as the Text Result, and writes `run.json` metadata for lifecycle status.
+
+## Uninstalling
+
+Use Windows Apps settings or:
+
+```powershell
+msiexec /x SimpleJobRunnerSetup-x64.msi
+```
+
+Uninstalling removes app files. It does not delete each user's `%LOCALAPPDATA%\SimpleJobRunner` state or final output folders.

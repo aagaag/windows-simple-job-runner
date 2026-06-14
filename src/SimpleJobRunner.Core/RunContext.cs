@@ -10,4 +10,8 @@ public sealed record RunContext(
     string SummaryPath,
     string TranscriptPath,
     string EventsPath,
-    string FinalOutputPath);
+    string FinalOutputPath)
+{
+    public string MetadataPath => Path.Combine(RunRoot, "run.json");
+    public string DiagnosticsPath => Path.Combine(RunRoot, "diagnostics.log");
+}

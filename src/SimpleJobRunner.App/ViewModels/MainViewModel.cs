@@ -1,12 +1,16 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using System.Windows;
 using System.Windows.Input;
 using SimpleJobRunner.App.Mvvm;
 using SimpleJobRunner.App.Services;
 using SimpleJobRunner.Core;
+using SimpleJobRunner.Core.Codex;
 using SimpleJobRunner.Core.Runs;
+using SimpleJobRunner.Core.Security;
 
 namespace SimpleJobRunner.App.ViewModels;
 
@@ -25,10 +29,14 @@ public sealed class MainViewModel : ObservableObject
     private readonly IOutputCollector _outputCollector;
     private readonly TaskModeClassifier _taskModeClassifier = new();
     private readonly RunResultFactory _runResultFactory = new();
+    private readonly RunMetadataStore _runMetadataStore = new();
+    private readonly RunDiagnostics _runDiagnostics = new();
+    private readonly RunRetentionManager _runRetentionManager = new();
 
     private string _promptText = string.Empty;
     private string _textResult = string.Empty;
     private string _detailsText = string.Empty;
+    private string _diagnosticsText = string.Empty;
     private string _statusMessage = "Ready.";
     private string _setupMessage = "Checking setup.";
     private string _outputRoot = AppPaths.DefaultOutputRoot;
@@ -85,6 +93,10 @@ public sealed class MainViewModel : ObservableObject
         SaveTextAsTxtCommand = new AsyncRelayCommand(() => SaveTextResultAsync(".txt"));
         SaveTextAsMdCommand = new AsyncRelayCommand(() => SaveTextResultAsync(".md"));
         ClearResultCommand = new RelayCommand(ClearResult);
+        CopyDiagnosticsCommand = new RelayCommand(CopyDiagnostics);
+        ExportDiagnosticsCommand = new AsyncRelayCommand(ExportDiagnosticsAsync);
+        ShowSafetyInfoCommand = new RelayCommand(ShowSafetyInfo);
+        SafeTestPromptCommand = new RelayCommand(UseSafeTestPrompt);
         _selectedTaskMode = TaskModes[0];
     }
 
@@ -119,6 +131,10 @@ public sealed class MainViewModel : ObservableObject
     public ICommand SaveTextAsTxtCommand { get; }
     public ICommand SaveTextAsMdCommand { get; }
     public ICommand ClearResultCommand { get; }
+    public ICommand CopyDiagnosticsCommand { get; }
+    public ICommand ExportDiagnosticsCommand { get; }
+    public ICommand ShowSafetyInfoCommand { get; }
+    public ICommand SafeTestPromptCommand { get; }
 
     public string PromptText
     {
@@ -148,6 +164,12 @@ public sealed class MainViewModel : ObservableObject
     {
         get => _detailsText;
         private set => SetProperty(ref _detailsText, value);
+    }
+
+    public string DiagnosticsText
+    {
+        get => _diagnosticsText;
+        private set => SetProperty(ref _diagnosticsText, value);
     }
 
     public string StatusMessage
@@ -321,6 +343,12 @@ public sealed class MainViewModel : ObservableObject
     public async Task RefreshSetupStatusAsync(CancellationToken ct)
     {
         var settings = await _settingsStore.LoadAsync(ct);
+        if (settings.AutoDeleteOldRuns)
+        {
+            await _runRetentionManager.PurgeOldRunsAsync(settings.RunRetentionDays, ct);
+            await _runRetentionManager.PurgeOldDiagnosticsAsync(settings.DiagnosticsRetentionDays, ct);
+        }
+
         OutputRoot = settings.OutputRoot;
         var keyConfigured = !string.IsNullOrWhiteSpace(await _credentialStore.GetOpenAiApiKeyAsync(ct));
         var codex = await _codexAvailabilityService.CheckAsync(ct);
@@ -446,6 +474,12 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(EmptyFilesVisibility));
         TextResult = string.Empty;
         DetailsText = string.Empty;
+        DiagnosticsText = string.Empty;
+        var stopwatch = Stopwatch.StartNew();
+        RunContext? run = null;
+        RunMetadata? metadata = null;
+        string? codexApiKey = null;
+        bool externalActionConfirmed = false;
         try
         {
             var settings = await _settingsStore.LoadAsync(CancellationToken.None);
@@ -455,7 +489,6 @@ public sealed class MainViewModel : ObservableObject
                 throw new InvalidOperationException(codex.ErrorMessage ?? "Codex CLI is not ready.");
             }
 
-            string? codexApiKey = null;
             if (settings.CodexAuthMode == CodexAuthMode.UseStoredOpenAiApiKey)
             {
                 codexApiKey = await _credentialStore.GetOpenAiApiKeyAsync(CancellationToken.None);
@@ -472,10 +505,15 @@ public sealed class MainViewModel : ObservableObject
             }
 
             var sandboxMode = GetSandboxMode(taskMode);
+            externalActionConfirmed = taskMode == TaskMode.ExternalAction;
             var runManager = new RunFolderManager(finalOutputRoot: settings.OutputRoot);
-            var run = await runManager.CreateRunAsync(PromptText, CancellationToken.None);
+            run = await runManager.CreateRunAsync(PromptText, CancellationToken.None);
             _currentRun = run;
-            AddProgress("Created run folder.");
+            metadata = _runMetadataStore.Create(run, taskMode, sandboxMode, GetAppVersion(), Inputs.Count, externalActionConfirmed);
+            await _runMetadataStore.WriteAsync(run, metadata, CancellationToken.None);
+            await _runMetadataStore.UpdateStatusAsync(run, metadata, RunStatus.Preparing, CancellationToken.None);
+            AddProgress("Created disposable workspace.");
+            await _runDiagnostics.AppendAsync(run, $"Run {run.Slug} created. Mode={taskMode}; Sandbox={sandboxMode.ToCliValue()}; AppVersion={GetAppVersion()}", [codexApiKey], CancellationToken.None);
             await runManager.StageFilesAsync(run, Inputs.Select(item => item.Path).ToArray(), CancellationToken.None);
             AddProgress($"Copied {Inputs.Count} input path(s).");
             await runManager.WriteRunInstructionsAsync(run, CancellationToken.None);
@@ -489,8 +527,10 @@ public sealed class MainViewModel : ObservableObject
             var builtPrompt = _promptBuilder.BuildPrompt(PromptText, run, taskMode);
             var commandsRun = new List<string>
             {
-                $"codex exec --cd <run> --skip-git-repo-check --ephemeral --sandbox {sandboxMode.ToCliValue()} --json --output-last-message <run>\\summary.md -"
+                $"codex exec --cd \"<run>\" --skip-git-repo-check --ephemeral --sandbox {sandboxMode.ToCliValue()} --json --output-last-message \"<run>\\summary.md\" -"
             };
+            await _runDiagnostics.AppendAsync(run, commandsRun[0], [codexApiKey], CancellationToken.None);
+            await _runMetadataStore.UpdateStatusAsync(run, metadata, RunStatus.RunningCodex, CancellationToken.None);
             AddProgress($"Running Codex with {sandboxMode.ToCliValue()} sandbox.");
             await foreach (var codexEvent in _codexRunner.RunAsync(run, builtPrompt, new CodexRunOptions
                            {
@@ -502,10 +542,14 @@ public sealed class MainViewModel : ObservableObject
             {
                 if (!string.IsNullOrWhiteSpace(codexEvent.Message))
                 {
-                    AddProgress($"{codexEvent.EventType}: {codexEvent.Message}");
+                    var message = SecretMasker.Redact($"{codexEvent.EventType}: {codexEvent.Message}", [codexApiKey]);
+                    AddProgress(message);
+                    await _runDiagnostics.AppendAsync(run, message, [codexApiKey], CancellationToken.None);
                 }
             }
 
+            metadata.CodexExitCode = 0;
+            await _runMetadataStore.UpdateStatusAsync(run, metadata, RunStatus.CollectingOutputs, CancellationToken.None);
             var outputs = await _outputCollector.CollectOutputsAsync(run, CancellationToken.None);
             foreach (var output in outputs)
             {
@@ -529,9 +573,15 @@ public sealed class MainViewModel : ObservableObject
                 CancellationToken.None);
 
             TextResult = result.TextResult;
-            DetailsText = BuildDetailsText(result);
+            metadata.OutputFileCount = outputs.Count;
+            metadata.HasTextResult = !string.IsNullOrWhiteSpace(result.TextResult);
+            await _runMetadataStore.UpdateStatusAsync(run, metadata, RunStatus.Completed, CancellationToken.None);
+            stopwatch.Stop();
+            DetailsText = BuildDetailsText(result, run, metadata, stopwatch.Elapsed);
             OnPropertyChanged(nameof(EmptyFilesVisibility));
-            DeleteDirectoryIfExists(run.TempPath);
+            await _runDiagnostics.AppendAsync(run, "Run completed.", [codexApiKey], CancellationToken.None);
+            await _runRetentionManager.CleanupSuccessfulRunAsync(run, settings, CancellationToken.None);
+            DiagnosticsText = await _runDiagnostics.ReadAsync(run, CancellationToken.None);
             AddProgress(outputs.Count == 0 ? "Completed with text result and no generated files." : $"Created {outputs.Count} output file(s).");
             SelectedResultTabIndex = 0;
             StatusMessage = outputs.Count == 0
@@ -540,12 +590,30 @@ public sealed class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            stopwatch.Stop();
             StatusMessage = "Job failed.";
-            var failed = RunResult.Failed(ex.Message);
+            var explanation = FailureExplanation.FromException(ex, run?.DiagnosticsPath);
+            var safeFailureText = SecretMasker.Redact(explanation.ToString(), [codexApiKey]);
+            if (run is not null)
+            {
+                await _runDiagnostics.AppendAsync(run, safeFailureText, [codexApiKey], CancellationToken.None);
+                DiagnosticsText = await _runDiagnostics.ReadAsync(run, CancellationToken.None);
+            }
+
+            if (metadata is not null && run is not null)
+            {
+                metadata.CodexExitCode = ex is CodexRunnerException codexException ? codexException.ExitCode : metadata.CodexExitCode;
+                metadata.ErrorSummary = SecretMasker.Redact(ex.Message, [codexApiKey]);
+                await _runMetadataStore.UpdateStatusAsync(run, metadata, RunStatus.Failed, CancellationToken.None);
+            }
+
+            var failed = RunResult.Failed(safeFailureText);
             TextResult = failed.TextResult;
-            DetailsText = BuildDetailsText(failed);
+            DetailsText = run is not null && metadata is not null
+                ? BuildDetailsText(failed, run, metadata, stopwatch.Elapsed)
+                : BuildDetailsText(failed);
             SelectedResultTabIndex = 0;
-            _messageService.ShowError("Job failed", ex.Message);
+            _messageService.ShowError("Job failed", $"{explanation.WhatHappened}\n\n{explanation.WhatToTryNext}");
         }
         finally
         {
@@ -560,15 +628,24 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        if (!_messageService.Confirm("Forget this job", "Delete the disposable run folder? Final copied outputs will remain."))
+        var settings = await _settingsStore.LoadAsync(CancellationToken.None);
+        var outputAction = settings.PreserveOutputsOnForget
+            ? "Final copied outputs will remain."
+            : "Final copied outputs will also be deleted because Settings allows deleting outputs when forgetting jobs.";
+        if (!_messageService.Confirm("Forget this job", $"Delete the disposable run folder, prompt, transcript, logs, and diagnostics for this job?\n\n{outputAction}"))
         {
             return;
         }
 
         var manager = new RunFolderManager();
-        await manager.CleanupAsync(_currentRun, CleanupMode.DeleteRunFolder, CancellationToken.None);
+        await manager.CleanupAsync(
+            _currentRun,
+            settings.PreserveOutputsOnForget ? CleanupMode.DeleteRunFolder : CleanupMode.DeleteRunAndFinalOutputs,
+            CancellationToken.None);
         AddProgress("Deleted disposable run folder.");
-        StatusMessage = "Job forgotten. Final outputs were kept.";
+        StatusMessage = settings.PreserveOutputsOnForget
+            ? "Job forgotten. Final outputs were kept."
+            : "Job forgotten. Final outputs were deleted.";
         _currentRun = null;
     }
 
@@ -644,10 +721,60 @@ public sealed class MainViewModel : ObservableObject
     {
         TextResult = string.Empty;
         DetailsText = string.Empty;
+        DiagnosticsText = string.Empty;
         Outputs.Clear();
         ProgressItems.Clear();
         OnPropertyChanged(nameof(EmptyFilesVisibility));
         StatusMessage = "Result cleared.";
+    }
+
+    private void CopyDiagnostics()
+    {
+        if (!string.IsNullOrWhiteSpace(DiagnosticsText))
+        {
+            System.Windows.Clipboard.SetText(DiagnosticsText);
+            StatusMessage = "Diagnostics copied.";
+        }
+    }
+
+    private async Task ExportDiagnosticsAsync()
+    {
+        if (_currentRun is null)
+        {
+            return;
+        }
+
+        var defaultName = $"simple-job-diagnostics-{_currentRun.Slug}.zip";
+        var path = await _filePicker.PickSaveFileAsync(defaultName, "Zip files (*.zip)|*.zip|All files (*.*)|*.*");
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        await _runDiagnostics.ExportBundleAsync(
+            _currentRun,
+            path,
+            BuildProgressTimeline(),
+            GetAppVersion(),
+            [],
+            CancellationToken.None);
+        StatusMessage = $"Diagnostics exported: {path}";
+    }
+
+    private void ShowSafetyInfo()
+    {
+        _messageService.ShowInfo(
+            "About and safety",
+            "Simple Job Runner is a Windows front end for disposable Codex-powered tasks.\n\nIt can read selected local files, run Codex CLI, and create or modify files inside a disposable workspace. Depending on the task and mode, it may also run commands or request external actions.\n\nThis app is a convenience and workflow tool. It is not a security boundary, not a compliance system, and not a substitute for reviewing commands or outputs before using them.\n\nDo not process patient-identifiable, client-confidential, medical, legal, financial, trade-secret, or regulated data unless your account, organization, jurisdiction, and policies allow it.\n\nReview results before relying on them.");
+    }
+
+    private void UseSafeTestPrompt()
+    {
+        PromptText = "Say hello and report the current working directory. Do not create files.";
+        _taskModeManuallySelected = false;
+        SetSelectedTaskMode(TaskMode.TextQuery, manual: false);
+        IsPromptCollapsed = false;
+        StatusMessage = "Safe Text Query test prompt is ready.";
     }
 
     private static string BuildDetailsText(RunResult result)
@@ -661,6 +788,43 @@ public sealed class MainViewModel : ObservableObject
         AppendSection(builder, "Files not processed", result.FilesNotProcessed);
         AppendSection(builder, "Output files", result.OutputFiles.Select(file => file.FinalPath).ToArray());
         return builder.ToString().TrimEnd();
+    }
+
+    private static string BuildDetailsText(RunResult result, RunContext run, RunMetadata metadata, TimeSpan elapsed)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"Result type: {FormatResultType(result.ResultType)}");
+        builder.AppendLine($"Run ID: {metadata.RunId}");
+        builder.AppendLine($"Run folder: {run.RunRoot}");
+        builder.AppendLine($"Mode: {metadata.Mode}");
+        builder.AppendLine($"Sandbox: {metadata.Sandbox}");
+        builder.AppendLine($"Input files: {metadata.InputFileCount}");
+        builder.AppendLine($"Output files: {metadata.OutputFileCount}");
+        builder.AppendLine($"Text result: {(metadata.HasTextResult ? "yes" : "no")}");
+        builder.AppendLine($"External action requested: {(metadata.ExternalActionRequested ? "yes" : "no")}");
+        builder.AppendLine($"External action confirmed: {(metadata.ExternalActionConfirmed ? "yes" : "no")}");
+        builder.AppendLine($"Codex exit code: {metadata.CodexExitCode?.ToString() ?? "(not available)"}");
+        builder.AppendLine($"Elapsed time: {elapsed:mm\\:ss}");
+        builder.AppendLine($"Metadata: {run.MetadataPath}");
+        builder.AppendLine($"Diagnostics: {run.DiagnosticsPath}");
+        builder.AppendLine();
+        AppendSection(builder, "Commands run", result.CommandsRun);
+        AppendSection(builder, "Warnings", result.Warnings);
+        AppendSection(builder, "Assumptions", result.Assumptions);
+        AppendSection(builder, "Files not processed", result.FilesNotProcessed);
+        AppendSection(builder, "Output files", result.OutputFiles.Select(file => file.FinalPath).ToArray());
+        return builder.ToString().TrimEnd();
+    }
+
+    private string BuildProgressTimeline()
+    {
+        var builder = new StringBuilder();
+        foreach (var item in ProgressItems)
+        {
+            builder.AppendLine($"{item.Timestamp:O} {item.Message}");
+        }
+
+        return builder.ToString();
     }
 
     private static void AppendSection(StringBuilder builder, string title, IReadOnlyList<string> values)
@@ -699,11 +863,10 @@ public sealed class MainViewModel : ObservableObject
         ProgressItems.Add(new ProgressItemViewModel(DateTimeOffset.Now, message));
     }
 
-    private static void DeleteDirectoryIfExists(string path)
+    private static string GetAppVersion()
     {
-        if (Directory.Exists(path))
-        {
-            Directory.Delete(path, recursive: true);
-        }
+        return Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString()
+            ?? "unknown";
     }
 }

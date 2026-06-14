@@ -6,6 +6,8 @@ Simple Job Runner has two different kinds of secrets: runtime user secrets and C
 
 The user's OpenAI API key is optional for typed jobs. It is required for in-app voice transcription and for Codex API-key mode. When configured, it is stored on each Windows computer in Windows Credential Locker under the current Windows user. It is not stored in this repository, app settings, prompt files, transcript files, logs, installers, or GitHub Actions.
 
+The app redacts likely OpenAI keys, GitHub tokens, bearer tokens, password-like command arguments, and values assigned to variable names containing `API_KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `KEY`, or `CREDENTIAL` before diagnostics are displayed or exported.
+
 ## Codex CLI execution
 
 Simple Job Runner can either rely on existing Codex CLI authentication or pass the stored API key to a single `codex exec` child process using the `CODEX_API_KEY` environment variable. Existing CLI authentication can use `codex login`, including ChatGPT login. When API-key mode is used, the variable is set only for the child process and is not persisted globally.
@@ -23,5 +25,6 @@ GitHub repository secrets are only for CI/CD. They may include code-signing cert
 - No API key in prompt files.
 - No API key in transcripts.
 - No API key in summary files or generated output files.
+- No API key in `run.json` or diagnostics exports.
 - No API key in crash reports.
 - No full API key displayed after saving.
