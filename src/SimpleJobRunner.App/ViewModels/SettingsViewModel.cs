@@ -2,6 +2,7 @@ using System.Windows.Input;
 using SimpleJobRunner.App.Mvvm;
 using SimpleJobRunner.App.Services;
 using SimpleJobRunner.Core;
+using SimpleJobRunner.Core.Runs;
 using SimpleJobRunner.Core.Security;
 
 namespace SimpleJobRunner.App.ViewModels;
@@ -20,8 +21,13 @@ public sealed class SettingsViewModel : ObservableObject
     private string _selectedSpeechModel = "gpt-4o-transcribe";
     private CodexAuthModeChoice _selectedCodexAuthMode;
     private int _runRetentionDays = 7;
+    private int _diagnosticsRetentionDays = 1;
     private bool _debugLogging;
     private bool _retainTranscripts;
+    private bool _retainPrompts;
+    private bool _autoDeleteOldRuns = true;
+    private bool _preserveOutputsOnForget = true;
+    private bool _privacyMode;
     private string _statusMessage = string.Empty;
 
     public SettingsViewModel(
@@ -43,6 +49,7 @@ public sealed class SettingsViewModel : ObservableObject
         DeleteKeyCommand = new AsyncRelayCommand(DeleteKeyAsync);
         TestKeyCommand = new AsyncRelayCommand(TestKeyAsync);
         BrowseOutputFolderCommand = new AsyncRelayCommand(BrowseOutputFolderAsync);
+        PurgeOldRunsCommand = new AsyncRelayCommand(PurgeOldRunsAsync);
         CloseCommand = new RelayCommand(() => CloseRequested?.Invoke());
     }
 
@@ -65,6 +72,7 @@ public sealed class SettingsViewModel : ObservableObject
     public ICommand DeleteKeyCommand { get; }
     public ICommand TestKeyCommand { get; }
     public ICommand BrowseOutputFolderCommand { get; }
+    public ICommand PurgeOldRunsCommand { get; }
     public ICommand CloseCommand { get; }
 
     public string ApiKeyInput
@@ -109,10 +117,49 @@ public sealed class SettingsViewModel : ObservableObject
         set => SetProperty(ref _debugLogging, value);
     }
 
+    public int DiagnosticsRetentionDays
+    {
+        get => _diagnosticsRetentionDays;
+        set => SetProperty(ref _diagnosticsRetentionDays, value);
+    }
+
     public bool RetainTranscripts
     {
         get => _retainTranscripts;
         set => SetProperty(ref _retainTranscripts, value);
+    }
+
+    public bool RetainPrompts
+    {
+        get => _retainPrompts;
+        set => SetProperty(ref _retainPrompts, value);
+    }
+
+    public bool AutoDeleteOldRuns
+    {
+        get => _autoDeleteOldRuns;
+        set => SetProperty(ref _autoDeleteOldRuns, value);
+    }
+
+    public bool PreserveOutputsOnForget
+    {
+        get => _preserveOutputsOnForget;
+        set => SetProperty(ref _preserveOutputsOnForget, value);
+    }
+
+    public bool PrivacyMode
+    {
+        get => _privacyMode;
+        set
+        {
+            if (SetProperty(ref _privacyMode, value) && value)
+            {
+                RetainTranscripts = false;
+                RetainPrompts = false;
+                DebugLogging = false;
+                DiagnosticsRetentionDays = 1;
+            }
+        }
     }
 
     public string StatusMessage
@@ -128,8 +175,13 @@ public sealed class SettingsViewModel : ObservableObject
         SelectedSpeechModel = settings.SpeechModel;
         SelectedCodexAuthMode = CodexAuthModes.First(choice => choice.Mode == settings.CodexAuthMode);
         RunRetentionDays = settings.RunRetentionDays;
+        DiagnosticsRetentionDays = settings.DiagnosticsRetentionDays;
         DebugLogging = settings.DebugLogging;
         RetainTranscripts = settings.RetainTranscripts;
+        RetainPrompts = settings.RetainPrompts;
+        AutoDeleteOldRuns = settings.AutoDeleteOldRuns;
+        PreserveOutputsOnForget = settings.PreserveOutputsOnForget;
+        PrivacyMode = settings.PrivacyMode;
         MaskedApiKey = SecretMasker.MaskOpenAiKey(await _credentialStore.GetOpenAiApiKeyAsync(ct));
     }
 
@@ -141,8 +193,13 @@ public sealed class SettingsViewModel : ObservableObject
             SpeechModel = SelectedSpeechModel,
             CodexAuthMode = SelectedCodexAuthMode.Mode,
             RunRetentionDays = RunRetentionDays,
+            DiagnosticsRetentionDays = DiagnosticsRetentionDays,
             DebugLogging = DebugLogging,
-            RetainTranscripts = RetainTranscripts
+            RetainTranscripts = RetainTranscripts,
+            RetainPrompts = RetainPrompts,
+            AutoDeleteOldRuns = AutoDeleteOldRuns,
+            PreserveOutputsOnForget = PreserveOutputsOnForget,
+            PrivacyMode = PrivacyMode
         };
 
         await _settingsStore.SaveAsync(settings, CancellationToken.None);
@@ -201,6 +258,17 @@ public sealed class SettingsViewModel : ObservableObject
         {
             OutputRoot = folder;
         }
+    }
+
+    private async Task PurgeOldRunsAsync()
+    {
+        if (!_messageService.Confirm("Purge old runs", $"Delete disposable run folders older than {RunRetentionDays} day(s)? Final output folders are not deleted."))
+        {
+            return;
+        }
+
+        var deleted = await new RunRetentionManager().PurgeOldRunsAsync(RunRetentionDays, CancellationToken.None);
+        StatusMessage = $"Purged {deleted} old run folder(s).";
     }
 }
 

@@ -134,6 +134,8 @@ public sealed class CoreTests : IDisposable
         Assert.Equal(TaskMode.FileJob, classifier.Classify("Create a small CSV file in outputs."));
         Assert.Equal(TaskMode.ExternalAction, classifier.Classify("Create a private GitHub repository called simple-job-test."));
         Assert.Equal(TaskMode.AdminSensitive, classifier.Classify("Install packages and restart service."));
+        Assert.Equal(TaskMode.ExternalAction, classifier.Classify("Delete the GitHub repo called old-project."));
+        Assert.Equal(TaskMode.AdminSensitive, classifier.Classify(@"Delete all files in C:\Temp\OldBackups."));
     }
 
     [Fact]
@@ -276,6 +278,146 @@ public sealed class CoreTests : IDisposable
     {
         Assert.Equal("sk-...7890", SecretMasker.MaskOpenAiKey("sk-1234567890"));
         Assert.True(SecretMasker.ContainsLikelyOpenAiKey("value " + FakeOpenAiKey()));
+    }
+
+    [Fact]
+    public void SecretMasker_RedactsTokensAndSensitiveAssignments()
+    {
+        var openAiLike = "sk-" + "test-secret-value";
+        var standaloneGitHubLike = "ghp_" + "standalonetoken";
+        var assignedGitHubLike = "ghp_" + "testtoken";
+        var bearerValue = "abcdefgh" + "ijklmnop";
+        var passwordValue = "super" + "secret";
+        var argumentValue = "visible" + "value";
+        var text =
+            "Authorization: Bearer "
+            + bearerValue
+            + Environment.NewLine
+            + "password="
+            + passwordValue
+            + Environment.NewLine
+            + "--api-key "
+            + argumentValue
+            + Environment.NewLine
+            + openAiLike
+            + Environment.NewLine
+            + standaloneGitHubLike
+            + Environment.NewLine
+            + "GITHUB_TOKEN="
+            + assignedGitHubLike;
+
+        var redacted = SecretMasker.Redact(text);
+
+        Assert.DoesNotContain(openAiLike, redacted);
+        Assert.DoesNotContain(standaloneGitHubLike, redacted);
+        Assert.DoesNotContain(assignedGitHubLike, redacted);
+        Assert.DoesNotContain(bearerValue, redacted);
+        Assert.DoesNotContain(passwordValue, redacted);
+        Assert.DoesNotContain(argumentValue, redacted);
+        Assert.Contains("[redacted]", redacted);
+    }
+
+    [Fact]
+    public async Task RunMetadataStore_WritesLifecycleMetadata()
+    {
+        var run = TestRun();
+        Directory.CreateDirectory(run.RunRoot);
+        var store = new RunMetadataStore(new FixedTimeProvider(new DateTimeOffset(2026, 6, 14, 12, 3, 4, TimeSpan.Zero)));
+        var metadata = store.Create(run, TaskMode.TextQuery, CodexSandboxMode.ReadOnly, "0.3.0", 2, externalActionConfirmed: false);
+
+        await store.WriteAsync(run, metadata, CancellationToken.None);
+        await store.UpdateStatusAsync(run, metadata, RunStatus.Completed, CancellationToken.None);
+
+        var saved = await store.ReadAsync(run, CancellationToken.None);
+        Assert.NotNull(saved);
+        Assert.Equal(run.Slug, saved.RunId);
+        Assert.Equal(RunStatus.Completed, saved.Status);
+        Assert.Equal(TaskMode.TextQuery, saved.Mode);
+        Assert.Equal("read-only", saved.Sandbox);
+        Assert.Equal(2, saved.InputFileCount);
+        Assert.NotNull(saved.CompletedAt);
+        Assert.True(File.Exists(run.MetadataPath));
+    }
+
+    [Fact]
+    public async Task RunRetentionManager_CleansSuccessfulRunTransientFiles()
+    {
+        var run = TestRun();
+        Directory.CreateDirectory(run.RunRoot);
+        Directory.CreateDirectory(run.TempPath);
+        Directory.CreateDirectory(run.FinalOutputPath);
+        await File.WriteAllTextAsync(run.PromptPath, "prompt");
+        await File.WriteAllTextAsync(run.TranscriptPath, "transcript");
+        await File.WriteAllTextAsync(run.EventsPath, "events");
+        await File.WriteAllTextAsync(run.SummaryPath, "summary");
+        await File.WriteAllTextAsync(run.DiagnosticsPath, "diagnostics");
+        await File.WriteAllTextAsync(Path.Combine(run.FinalOutputPath, "result.txt"), "kept");
+
+        await new RunRetentionManager().CleanupSuccessfulRunAsync(
+            run,
+            new AppSettings
+            {
+                RetainPrompts = false,
+                RetainTranscripts = false,
+                DebugLogging = false
+            },
+            CancellationToken.None);
+
+        Assert.False(Directory.Exists(run.TempPath));
+        Assert.False(File.Exists(run.PromptPath));
+        Assert.False(File.Exists(run.TranscriptPath));
+        Assert.False(File.Exists(run.EventsPath));
+        Assert.True(File.Exists(run.SummaryPath));
+        Assert.True(File.Exists(run.DiagnosticsPath));
+        Assert.True(File.Exists(Path.Combine(run.FinalOutputPath, "result.txt")));
+    }
+
+    [Fact]
+    public async Task RunRetentionManager_PurgesOldRunFoldersOnly()
+    {
+        var stateRoot = Path.Combine(_root, "state");
+        var runsRoot = Path.Combine(stateRoot, "runs");
+        var oldRun = Path.Combine(runsRoot, "old");
+        var newRun = Path.Combine(runsRoot, "new");
+        Directory.CreateDirectory(oldRun);
+        Directory.CreateDirectory(newRun);
+        Directory.SetLastWriteTime(oldRun, new DateTime(2026, 6, 1));
+        Directory.SetLastWriteTime(newRun, new DateTime(2026, 6, 14));
+
+        var manager = new RunRetentionManager(
+            stateRoot,
+            new FixedTimeProvider(new DateTimeOffset(2026, 6, 14, 12, 0, 0, TimeSpan.Zero)));
+        var deleted = await manager.PurgeOldRunsAsync(7, CancellationToken.None);
+
+        Assert.Equal(1, deleted);
+        Assert.False(Directory.Exists(oldRun));
+        Assert.True(Directory.Exists(newRun));
+    }
+
+    [Fact]
+    public async Task RunRetentionManager_PurgesOldDiagnosticsOnly()
+    {
+        var stateRoot = Path.Combine(_root, "state");
+        var oldRun = Path.Combine(stateRoot, "runs", "old");
+        var newRun = Path.Combine(stateRoot, "runs", "new");
+        Directory.CreateDirectory(oldRun);
+        Directory.CreateDirectory(newRun);
+        var oldDiagnostics = Path.Combine(oldRun, "diagnostics.log");
+        var newDiagnostics = Path.Combine(newRun, "diagnostics.log");
+        await File.WriteAllTextAsync(oldDiagnostics, "old");
+        await File.WriteAllTextAsync(newDiagnostics, "new");
+        File.SetLastWriteTime(oldDiagnostics, new DateTime(2026, 6, 1));
+        File.SetLastWriteTime(newDiagnostics, new DateTime(2026, 6, 14));
+
+        var manager = new RunRetentionManager(
+            stateRoot,
+            new FixedTimeProvider(new DateTimeOffset(2026, 6, 14, 12, 0, 0, TimeSpan.Zero)));
+        var deleted = await manager.PurgeOldDiagnosticsAsync(1, CancellationToken.None);
+
+        Assert.Equal(1, deleted);
+        Assert.False(File.Exists(oldDiagnostics));
+        Assert.True(File.Exists(newDiagnostics));
+        Assert.True(Directory.Exists(oldRun));
     }
 
     [Fact]

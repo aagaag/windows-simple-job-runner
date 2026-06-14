@@ -32,6 +32,15 @@ codex login
 
 Use ChatGPT login if you want Codex to use your ChatGPT plan entitlement.
 
+The Text Result tab shows a failure explanation with:
+
+- What happened
+- Likely reason
+- What you can try next
+- Technical details
+
+The Details and Diagnostics tabs show run metadata, sanitized command summary, Codex exit code when available, and the diagnostics path.
+
 ## No Files Created
 
 That can be expected for Text Query mode. A run is successful when the Text Result tab contains a useful answer, even if the Files tab is empty.
@@ -44,4 +53,4 @@ The app asks for confirmation when a prompt looks like it may create something o
 
 ## Forget This Job Did Not Delete Final Outputs
 
-That is expected. Forgetting a job deletes the disposable run folder, not the final copied outputs.
+That is expected when **Preserve output files when forgetting a job** is enabled in Settings. Disable that setting only if you intentionally want **Forget this job** to delete final copied outputs too.

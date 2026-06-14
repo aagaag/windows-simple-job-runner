@@ -18,12 +18,13 @@ The build script restores packages and builds the WPF app, core library, and tes
 ## Packaging
 
 ```powershell
-./scripts/package.ps1 -Version 0.2.0
+./scripts/package.ps1 -Version 0.3.2
 ```
 
 The package script:
 
 - publishes the WPF app self-contained for `win-x64`;
+- verifies that the self-contained Windows desktop runtime files are present;
 - copies `README-portable.txt` into the publish folder;
 - creates `SimpleJobRunnerPortable-win-x64.zip`;
 - generates a WiX file list for the publish folder;

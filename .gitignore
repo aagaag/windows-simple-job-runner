@@ -5,6 +5,12 @@
 
 # dotenv files
 .env
+.env.*
+
+# Simple Job Runner local runtime artifacts
+/runs/
+*.bak
+*.local
 
 # User-specific files
 *.rsuser

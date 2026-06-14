@@ -54,9 +54,7 @@ public sealed class CodexRunner(CodexCommandBuilder? commandBuilder = null, Code
             {
                 if (eventWriter is not null)
                 {
-                    var persisted = string.IsNullOrEmpty(options.OpenAiApiKey)
-                        ? line
-                        : line.Replace(options.OpenAiApiKey, "[redacted]", StringComparison.Ordinal);
+                    var persisted = Security.SecretMasker.Redact(line, [options.OpenAiApiKey]);
                     await eventWriter.WriteLineAsync(persisted.AsMemory(), ct);
                 }
 

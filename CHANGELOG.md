@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.2 - Startup Fix
+
+- Fixed a WPF binding crash that prevented the main window from opening.
+- Kept the self-contained installer validation added in 0.3.1.
+
+## 0.3.1 - Installer Runtime Fix
+
+- Published a higher-version MSI so Windows upgrades earlier broken 0.3.0 installs.
+- Added package validation that fails if the self-contained Windows desktop runtime files are missing from the publish folder.
+- Clarified installation troubleshooting for the .NET Desktop Runtime dialog.
+
+## 0.3.0 - Skeptical Friend Hardening
+
+- Added clearer app positioning and safety language.
+- Added run lifecycle metadata in `run.json`.
+- Improved diagnostics and error visibility with a Diagnostics tab and sanitized diagnostics export.
+- Expanded secret redaction for OpenAI keys, GitHub tokens, bearer tokens, passwords, and sensitive assignments.
+- Added retention and cleanup controls for prompts, transcripts, diagnostics, old runs, and forgotten jobs.
+- Added mode-based confirmation copy for external and admin/sensitive actions.
+- Added a safe first-run test prompt.
+- Improved audit trail and command visibility in run details.
+- Improved Windows installer/shareability documentation.
+
 ## 0.2.0
 
 - Added a compact prompt editor with expand/collapse controls and automatic collapse when a run starts.

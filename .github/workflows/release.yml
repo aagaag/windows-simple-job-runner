@@ -16,6 +16,8 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore SimpleJobRunner.sln
       - name: Test
         shell: pwsh
         run: ./scripts/test.ps1

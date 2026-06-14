@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Simple Job Runner Settings"
-        Height="590"
+        Height="720"
         Width="660"
         MinWidth="560"
         MinHeight="520"
@@ -28,11 +28,23 @@
                     <Button Content="Test key"
                             Command="{Binding TestKeyCommand}"
                             ToolTip="Call the OpenAI API with the entered key, or the stored key if the box is empty, to verify that it works. This is not required for typed Codex jobs using existing CLI authentication." />
-                    <Button Content="Delete key"
+                    <Button Content="Remove key"
                             Command="{Binding DeleteKeyCommand}"
                             Margin="0"
                             ToolTip="Remove the saved OpenAI API key from Windows Credential Locker. Typed jobs can still run through existing Codex CLI authentication." />
                 </StackPanel>
+
+                <Border BorderBrush="#D6DAE0" BorderThickness="1" Background="#F7F9FB" Padding="10" Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="Safety and privacy" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock Text="Simple Job Runner is a Windows front end for disposable Codex-powered tasks. It is not a security boundary, not a compliance system, and not a substitute for reviewing commands or outputs before using them."
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,8" />
+                        <TextBlock Text="Sensitive data warning: Do not use this app with patient-identifiable information, medical records, client-confidential files, legal matters, financial records, trade secrets, or regulated data unless you have confirmed that your use is permitted by your organization, account terms, data-retention settings, jurisdiction, and professional obligations."
+                                   TextWrapping="Wrap"
+                                   Foreground="{StaticResource MutedBrush}" />
+                    </StackPanel>
+                </Border>
 
                 <TextBlock Text="Speech model" FontWeight="SemiBold" />
                 <ComboBox ItemsSource="{Binding SpeechModels}"
@@ -56,22 +68,49 @@
                              ToolTip="Final deliverables are copied here after Codex writes them to the disposable run folder. Forgetting a job does not delete this folder." />
                 </DockPanel>
 
-                <TextBlock Text="Retention" FontWeight="SemiBold" />
+                <TextBlock Text="Retention and cleanup" FontWeight="SemiBold" />
                 <StackPanel Orientation="Horizontal" Margin="0,4,0,10">
                     <TextBox Width="80"
                              Text="{Binding RunRetentionDays, UpdateSourceTrigger=PropertyChanged}"
                              ToolTip="Number of days to keep disposable run folders by default. Final output folders are kept until you delete them." />
                     <TextBlock Text="days to keep run folders by default" VerticalAlignment="Center" Margin="8,0,0,0" />
                 </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <TextBox Width="80"
+                             Text="{Binding DiagnosticsRetentionDays, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="Number of days to keep diagnostics by default. Diagnostics are sanitized, but may still include paths and task details." />
+                    <TextBlock Text="days to keep diagnostics by default" VerticalAlignment="Center" Margin="8,0,0,0" />
+                </StackPanel>
 
                 <CheckBox Content="Keep transcript files in run folders"
                           IsChecked="{Binding RetainTranscripts}"
                           Margin="0,0,0,8"
                           ToolTip="When enabled, the edited prompt/transcript is persisted in the run folder. Leave this off if prompts may contain sensitive information." />
+                <CheckBox Content="Keep prompt files after successful runs"
+                          IsChecked="{Binding RetainPrompts}"
+                          Margin="0,0,0,8"
+                          ToolTip="When enabled, prompt.txt is kept after successful runs. Leave this off if prompts may contain sensitive or client data." />
                 <CheckBox Content="Keep Codex JSONL debug logs"
                           IsChecked="{Binding DebugLogging}"
                           Margin="0,0,0,8"
                           ToolTip="When enabled, Codex JSONL progress is written to events.jsonl in the run folder. Leave this off unless troubleshooting." />
+                <CheckBox Content="Auto-delete old run folders"
+                          IsChecked="{Binding AutoDeleteOldRuns}"
+                          Margin="0,0,0,8"
+                          ToolTip="When enabled, old disposable run folders are eligible for purge according to the run-folder retention days." />
+                <CheckBox Content="Preserve output files when forgetting a job"
+                          IsChecked="{Binding PreserveOutputsOnForget}"
+                          Margin="0,0,0,8"
+                          ToolTip="When enabled, Forget this job deletes only transient run materials. Disable only if you want Forget this job to delete final copied outputs too." />
+                <CheckBox Content="Privacy Mode"
+                          IsChecked="{Binding PrivacyMode}"
+                          Margin="0,0,0,12"
+                          ToolTip="When enabled, transcripts, prompts, and debug logs are not kept after successful runs, and diagnostics retention is minimized." />
+                <Button Content="Purge old runs"
+                        Command="{Binding PurgeOldRunsCommand}"
+                        HorizontalAlignment="Left"
+                        Margin="0,0,0,12"
+                        ToolTip="Delete disposable run folders older than the configured retention period. Final output folders are not deleted." />
                 <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
             </StackPanel>
         </ScrollViewer>

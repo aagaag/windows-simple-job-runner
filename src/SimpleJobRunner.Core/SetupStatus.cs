@@ -11,12 +11,12 @@ public static class SetupStatusCalculator
 
         if (!codex.IsAvailable)
         {
-            return new SetupStatus(true, openAiApiKeyConfigured, "Setup needed: Codex CLI was not found on PATH.");
+            return new SetupStatus(true, openAiApiKeyConfigured, "Setup needed: Codex CLI was not found on PATH. Install and authenticate Codex CLI, then return here and reopen Settings or restart the app.");
         }
 
         if (!codex.SupportsRequiredExecFlags)
         {
-            return new SetupStatus(true, openAiApiKeyConfigured, "Setup needed: Codex CLI does not report all required non-interactive flags.");
+            return new SetupStatus(true, openAiApiKeyConfigured, "Setup needed: Codex CLI does not report all required non-interactive flags. Update Codex CLI, then retry.");
         }
 
         if (settings.CodexAuthMode == CodexAuthMode.UseStoredOpenAiApiKey && !openAiApiKeyConfigured)

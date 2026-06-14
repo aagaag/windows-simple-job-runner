@@ -26,15 +26,21 @@ public sealed class PromptBuilder : IPromptBuilder
             ./outputs
 
             Execution constraints:
-            - This is a one-off Simple Job.
+            - This is a disposable one-off task.
             - Always provide a useful final text answer. The runner captures your final answer into summary.md.
-            - If the user asks for a simple answer, status check, local query, calculation, command result, inventory, or list, return the answer directly as the text result.
+            - If the user asks for a simple answer, local query, command result, calculation, inventory, status check, list, or summary, return the answer directly as the text result.
             - Do not create an output file unless the user asks for one.
-            - If the user asks for a generated file, create it in ./outputs and summarize it in the text result.
+            - If the user asks for a generated file, create it in ./outputs and also provide a concise text result describing what was created.
+            - If the user asks for an external or persistent action, do not perform it silently. The runner must show a confirmation first.
+            - If the user asks for an admin or sensitive action, do not perform it silently. The runner must show a confirmation first.
             - If the job performs an external side effect, report exactly what was changed or created in the text result.
             - Generate requested file or files only when the user asks for files.
             - Keep temporary scripts and intermediates in ./temp.
-            - Do not create a repository or project scaffold.
+            - Do not initialize Git.
+            - Do not create GitHub repositories unless explicitly confirmed.
+            - Do not modify files outside the disposable workspace unless explicitly confirmed.
+            - Do not install dependencies without explicit confirmation.
+            - Do not store secrets in prompts, transcripts, logs, summaries, or outputs.
             """;
     }
 
