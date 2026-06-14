@@ -155,9 +155,9 @@ Invoke-Native dotnet publish .\src\SimpleJobRunner.App\SimpleJobRunner.App.cspro
     -r $Runtime `
     --self-contained true `
     -o $publishDir `
-    -p:Version=$Version `
-    -p:AssemblyVersion=$Version.0 `
-    -p:FileVersion=$Version.0
+    "-p:Version=$Version" `
+    "-p:AssemblyVersion=$Version.0" `
+    "-p:FileVersion=$Version.0"
 
 Copy-Item -LiteralPath .\README-portable.txt -Destination (Join-Path $publishDir "README-portable.txt") -Force
 
@@ -173,8 +173,8 @@ New-GeneratedWixFiles `
 
 Invoke-Native dotnet build .\installer\SimpleJobRunner.Installer\SimpleJobRunner.Installer.wixproj `
     -c $Configuration `
-    -p:PublishDir=$publishDir `
-    -p:ProductVersion=$Version
+    "-p:PublishDir=$publishDir" `
+    "-p:ProductVersion=$Version"
 
 $msiSource = Join-Path $repoRoot "installer\SimpleJobRunner.Installer\bin\x64\$Configuration\SimpleJobRunnerSetup-x64.msi"
 $msiTarget = Join-Path $releaseDir "SimpleJobRunnerSetup-x64.msi"
