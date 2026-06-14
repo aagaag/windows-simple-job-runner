@@ -18,7 +18,7 @@ The build script restores packages and builds the WPF app, core library, and tes
 ## Packaging
 
 ```powershell
-./scripts/package.ps1 -Version 0.3.1
+./scripts/package.ps1 -Version 0.3.2
 ```
 
 The package script:

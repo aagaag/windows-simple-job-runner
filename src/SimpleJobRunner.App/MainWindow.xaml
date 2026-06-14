@@ -195,7 +195,7 @@
                                         ToolTip="Clear the displayed text, file list, and progress for this completed run. It does not delete saved output files." />
                             </StackPanel>
                             <TextBox Grid.Row="1"
-                                     Text="{Binding TextResult}"
+                                     Text="{Binding TextResult, Mode=OneWay}"
                                      AcceptsReturn="True"
                                      IsReadOnly="True"
                                      TextWrapping="Wrap"
@@ -259,7 +259,7 @@
 
                     <TabItem Header="Details">
                         <Grid Margin="8">
-                            <TextBox Text="{Binding DetailsText}"
+                            <TextBox Text="{Binding DetailsText, Mode=OneWay}"
                                      AcceptsReturn="True"
                                      IsReadOnly="True"
                                      TextWrapping="Wrap"
@@ -287,7 +287,7 @@
                                         ToolTip="Save a sanitized diagnostics zip with run metadata, progress, summary, and diagnostics logs. Inputs and outputs are not included." />
                             </StackPanel>
                             <TextBox Grid.Row="1"
-                                     Text="{Binding DiagnosticsText}"
+                                     Text="{Binding DiagnosticsText, Mode=OneWay}"
                                      AcceptsReturn="True"
                                      IsReadOnly="True"
                                      TextWrapping="Wrap"

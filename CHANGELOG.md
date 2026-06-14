@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2 - Startup Fix
+
+- Fixed a WPF binding crash that prevented the main window from opening.
+- Kept the self-contained installer validation added in 0.3.1.
+
 ## 0.3.1 - Installer Runtime Fix
 
 - Published a higher-version MSI so Windows upgrades earlier broken 0.3.0 installs.
